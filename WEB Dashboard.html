@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <meta name="referrer" content="no-referrer-when-downgrade" />
+   
     <title>RF Coverage Heatmap Dashboard</title>
 
     <!-- Leaflet CSS -->
@@ -62,9 +65,10 @@
         const map = L.map('map').setView([11.0168, 76.9558], 13);
 
         // Load OpenStreetMap tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
 
         // Initialize Heatmap layer
         let heatLayer = L.heatLayer([], {

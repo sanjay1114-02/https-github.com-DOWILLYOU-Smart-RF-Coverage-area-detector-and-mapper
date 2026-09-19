@@ -1,0 +1,13 @@
+# Dependency folders (never upload these)
+node_modules/
+
+# Local data & logs (prevents committing temporary test readings)
+readings.json
+*.log
+
+# Environment files containing API keys or private variables
+.env
+
+# Operating System temporary files
+.DS_Store
+Thumbs.db
