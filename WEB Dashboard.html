@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RF Coverage Heatmap Dashboard</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #map { height: 100vh; width: 100vw; }
+        
+        .control-panel {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            max-width: 300px;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .btn:hover { background: #0056b3; }
+        .stat-box { font-size: 14px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <div class="control-panel">
+        <h3>RF Signal Mapper</h3>
+        <div class="stat-box"><strong>Total Readings:</strong> <span id="count">0</span></div>
+        <div class="stat-box"><strong>Avg Signal:</strong> <span id="avgRssi">-</span> dBm</div>
+        
+        <button class="btn" onclick="fetchServerData()">Sync Server Data</button>
+        <button class="btn" style="background:#28a745;" onclick="exportLocalStorage()">Export JSON Backup</button>
+        <button class="btn" style="background:#dc3545;" onclick="clearLocalCache()">Clear Cache</button>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet Heatmap Plugin -->
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+    <script>
+        // Initialize Map (Default centered near modern coordinates)
+        const map = L.map('map').setView([11.0168, 76.9558], 13);
+
+        // Load OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Initialize Heatmap layer
+        let heatLayer = L.heatLayer([], {
+            radius: 25,
+            blur: 15,
+            maxZoom: 17,
+            gradient: {
+                0.2: 'red',     // Weak / Bad signal
+                0.5: 'yellow',  // Fair signal
+                0.8: 'lime',    // Good signal
+                1.0: 'green'    // Excellent signal
+            }
+        }).addTo(map);
+
+        // Normalized RSSI (-110 dBm = 0 intensity, -50 dBm = 1 intensity)
+        function normalizeRssi(rssi) {
+            const min = -110;
+            const max = -50;
+            let norm = (rssi - min) / (max - min);
+            return Math.max(0.1, Math.min(1.0, norm));
+        }
+
+        // Save Data to Local Device Storage (Browser LocalStorage)
+        function saveToDeviceStorage(readings) {
+            localStorage.setItem('rf_readings_backup', JSON.stringify(readings));
+        }
+
+        // Load Data from Local Device Storage
+        function getDeviceStorageData() {
+            const data = localStorage.getItem('rf_readings_backup');
+            return data ? JSON.parse(data) : [];
+        }
+
+        // Process and Render Data onto Map
+        function renderData(readings) {
+            if (!readings || readings.length === 0) return;
+
+            const heatPoints = [];
+            let totalRssi = 0;
+
+            readings.forEach(item => {
+                const intensity = normalizeRssi(item.rssi);
+                heatPoints.push([item.lat, item.lng, intensity]);
+                totalRssi += item.rssi;
+
+                // Optional: Place small circle markers
+                L.circleMarker([item.lat, item.lng], {
+                    radius: 4,
+                    color: intensity > 0.5 ? 'green' : 'red',
+                    fillOpacity: 0.6
+                }).bindPopup(`<b>RSSI:</b> ${item.rssi} dBm<br><b>Time:</b> ${item.timestamp}`)
+                  .addTo(map);
+            });
+
+            // Update Heatmap
+            heatLayer.setLatLngs(heatPoints);
+
+            // Update Dashboard Analytics
+            document.getElementById('count').innerText = readings.length;
+            document.getElementById('avgRssi').innerText = (totalRssi / readings.length).toFixed(1);
+
+            // Center Map around last reading
+            const last = readings[readings.length - 1];
+            map.panTo([last.lat, last.lng]);
+
+            // Save copy to browser local storage
+            saveToDeviceStorage(readings);
+        }
+
+        // Fetch from Local Node.js Server
+        async function fetchServerData() {
+            try {
+                const res = await fetch('http://localhost:3000/api/readings');
+                const data = await res.json();
+                renderData(data);
+            } catch (err) {
+                console.warn('Local server unreachable. Loading from browser storage cache.');
+                const cachedData = getDeviceStorageData();
+                renderData(cachedData);
+            }
+        }
+
+        // Download local cache file
+        function exportLocalStorage() {
+            const data = localStorage.getItem('rf_readings_backup') || '[]';
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `rf_coverage_backup_${Date.now()}.json`;
+            a.click();
+        }
+
+        function clearLocalCache() {
+            localStorage.removeItem('rf_readings_backup');
+            location.reload();
+        }
+
+        // Load data on start
+        fetchServerData();
+    </script>
+</body>
+</html>
