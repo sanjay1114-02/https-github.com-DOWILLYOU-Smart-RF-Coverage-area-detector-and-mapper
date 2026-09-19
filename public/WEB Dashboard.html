@@ -12,7 +12,40 @@
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; }
-        #map { height: calc(100vh - 160px); width: 100vw; }
+        
+        #map-container {
+            position: relative;
+            height: calc(100vh - 160px);
+            width: 100vw;
+        }
+
+        #map { height: 100%; width: 100%; }
+
+        /* Floating Recenter Location Button (GMap Style) */
+        .recenter-btn {
+            position: absolute;
+            bottom: 25px;
+            right: 15px;
+            z-index: 1000;
+            background: #1e1e24;
+            color: #00d2ff;
+            border: 2px solid #007bff;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            transition: all 0.2s ease;
+        }
+        .recenter-btn:hover {
+            background: #007bff;
+            color: #fff;
+            transform: scale(1.08);
+        }
 
         /* Bottom Control Panel UI */
         .bottom-panel {
@@ -113,8 +146,10 @@
             cursor: pointer;
             font-size: 13px;
         }
-        .btn-upload { background: #28a745; }
-        .btn-upload:hover { background: #218838; }
+        .btn-start { background: #28a745; }
+        .btn-start:hover { background: #218838; }
+        .btn-stop { background: #dc3545; }
+        .btn-stop:hover { background: #c82333; }
         .btn-sync { background: #007bff; }
         .btn-sync:hover { background: #0056b3; }
 
@@ -123,7 +158,11 @@
 </head>
 <body>
 
-    <div id="map"></div>
+    <div id="map-container">
+        <div id="map"></div>
+        <!-- Google Maps Style Recenter Location Button -->
+        <button class="recenter-btn" onclick="recenterToUserLocation()" title="Re-center map to my location">🎯</button>
+    </div>
 
     <!-- Bottom Full-Width Dashboard -->
     <div class="bottom-panel">
@@ -138,6 +177,10 @@
                 <span style="font-size: 12px; color: #aaa;">📶 Select Provider:</span>
                 <select id="carrierSelect" class="carrier-select" onchange="filterMapByCarrier()">
                     <option value="ALL">All Providers (Combined)</option>
+                    <option value="Jio">Jio</option>
+                    <option value="Airtel">Airtel</option>
+                    <option value="Vodafone Vi">Vodafone Vi</option>
+                    <option value="ESP32 Prototype">ESP32 Prototype</option>
                 </select>
             </div>
         </div>
@@ -164,7 +207,7 @@
         <div class="actions-row">
             <span id="statusMessage" class="status-text">Status: Ready</span>
             <div>
-                <button id="uploadBtn" class="action-btn btn-upload" style="display:none;" onclick="captureAndUpload()">📤 Record & Upload to Cloud</button>
+                <button id="recordingBtn" class="action-btn btn-start" style="display:none;" onclick="toggleRecording()">▶️ Start Continuous Recording</button>
                 <button class="action-btn btn-sync" onclick="fetchServerData()">🔄 Sync Map</button>
             </div>
         </div>
@@ -178,6 +221,11 @@
         let currentMode = 'user';
         let allReadings = [];
         let userLocationMarker = null;
+        let currentUserCoords = null;
+
+        // Continuous Recording Variables
+        let isRecording = false;
+        let recordingWatchId = null;
 
         // Initialize Map
         const map = L.map('map').setView([11.0168, 76.9558], 14);
@@ -205,7 +253,16 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
-        // Find nearest strong signal point (>= -70 dBm) based on current carrier filter
+        // Recenter map back to current user position
+        function recenterToUserLocation() {
+            if (currentUserCoords) {
+                map.flyTo([currentUserCoords.latitude, currentUserCoords.longitude], 16, { animate: true, duration: 1 });
+            } else {
+                alert("Acquiring GPS location... Please wait a moment.");
+            }
+        }
+
+        // Find nearest strong signal point (>= -70 dBm)
         function calculateNearestStrongSignal(userLat, userLng) {
             const selectedCarrier = document.getElementById('carrierSelect').value;
             
@@ -226,33 +283,6 @@
             return minDistance < 1000 
                 ? `${Math.round(minDistance)} meters away` 
                 : `${(minDistance / 1000).toFixed(1)} km away`;
-        }
-
-        // Populate carrier dropdown dynamically with available carriers from DB
-        function updateCarrierDropdown() {
-            const selectElem = document.getElementById('carrierSelect');
-            const currentVal = selectElem.value;
-            
-            // Extract unique carrier names
-            const carriers = new Set();
-            allReadings.forEach(r => {
-                if (r.carrier) carriers.add(r.carrier);
-                else carriers.add("ESP32 Prototype");
-            });
-
-            // Rebuild option list
-            selectElem.innerHTML = `<option value="ALL">All Providers (Combined)</option>`;
-            carriers.forEach(carrier => {
-                const option = document.createElement('option');
-                option.value = carrier;
-                option.textContent = carrier;
-                selectElem.appendChild(option);
-            });
-
-            // Restore selection if still valid
-            if (carriers.has(currentVal) || currentVal === 'ALL') {
-                selectElem.value = currentVal;
-            }
         }
 
         // Filter and re-render heatmap layer based on selected provider
@@ -278,9 +308,8 @@
             }
 
             // Recalculate distance metric for current user position
-            if (userLocationMarker) {
-                const pos = userLocationMarker.getLatLng();
-                document.getElementById('nearestDistance').innerText = calculateNearestStrongSignal(pos.lat, pos.lng);
+            if (currentUserCoords) {
+                document.getElementById('nearestDistance').innerText = calculateNearestStrongSignal(currentUserCoords.latitude, currentUserCoords.longitude);
             }
         }
 
@@ -289,31 +318,37 @@
             currentMode = mode;
             document.getElementById('tab-user').classList.toggle('active', mode === 'user');
             document.getElementById('tab-collector').classList.toggle('active', mode === 'collector');
-            document.getElementById('uploadBtn').style.display = mode === 'collector' ? 'inline-block' : 'none';
+            
+            const recordBtn = document.getElementById('recordingBtn');
+            recordBtn.style.display = mode === 'collector' ? 'inline-block' : 'none';
 
             if (mode === 'collector') {
-                document.getElementById('statusMessage').innerText = "Collector Mode: Ready to log hardware reading.";
+                document.getElementById('statusMessage').innerText = isRecording 
+                    ? "Continuous Recording ACTIVE..." 
+                    : "Collector Mode: Press Start to log continuous data.";
             } else {
                 document.getElementById('statusMessage').innerText = "User Mode: Browsing signal coverage.";
             }
         }
 
-        // Locate user and update metrics
+        // Continuous location monitoring for current marker
         function trackUserLocation() {
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(pos => {
+                    currentUserCoords = pos.coords;
                     const { latitude, longitude } = pos.coords;
                     
                     if (!userLocationMarker) {
                         userLocationMarker = L.marker([latitude, longitude]).addTo(map).bindPopup("Your Location");
+                        map.setView([latitude, longitude], 15);
                     } else {
                         userLocationMarker.setLatLng([latitude, longitude]);
                     }
 
-                    // Update UI metrics
-                    const nearestStr = calculateNearestStrongSignal(latitude, longitude);
-                    document.getElementById('nearestDistance').innerText = nearestStr;
-                });
+                    document.getElementById('nearestDistance').innerText = calculateNearestStrongSignal(latitude, longitude);
+                }, err => {
+                    console.warn("Geolocation warning:", err.message);
+                }, { enableHighAccuracy: true });
             }
         }
 
@@ -322,50 +357,78 @@
             try {
                 const res = await fetch('/api/readings');
                 allReadings = await res.json();
-                
-                updateCarrierDropdown();
                 filterMapByCarrier();
-                
                 document.getElementById('statusMessage').innerText = "Data updated from server.";
             } catch (err) {
                 document.getElementById('statusMessage').innerText = "Server offline. Showing local data.";
             }
         }
 
-        // Capture & Upload Reading (Collector Mode)
-        function captureAndUpload() {
-            if (!("geolocation" in navigator)) {
-                alert("Geolocation not supported.");
-                return;
-            }
+        // Start/Stop Continuous Signal Recording
+        function toggleRecording() {
+            const btn = document.getElementById('recordingBtn');
 
-            document.getElementById('statusMessage').innerText = "Capturing location & signal...";
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                const selectedCarrier = document.getElementById('carrierSelect').value;
-                
-                const payload = {
-                    lat: pos.coords.latitude,
-                    lng: pos.coords.longitude,
-                    rssi: Math.floor(Math.random() * 41) - 100, // Simulated RSSI in web app
-                    carrier: selectedCarrier !== 'ALL' ? selectedCarrier : "Manual Entry",
-                    timestamp: new Date().toISOString()
-                };
-
-                try {
-                    const res = await fetch('/api/readings', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (res.ok) {
-                        document.getElementById('statusMessage').innerText = "Reading uploaded successfully!";
-                        fetchServerData();
-                    }
-                } catch (err) {
-                    document.getElementById('statusMessage').innerText = "Failed to upload reading to server.";
+            if (!isRecording) {
+                // START RECORDING
+                if (!("geolocation" in navigator)) {
+                    alert("Geolocation is not supported by your browser.");
+                    return;
                 }
-            });
+
+                isRecording = true;
+                btn.innerText = "⏹️ Stop Recording";
+                btn.className = "action-btn btn-stop";
+                document.getElementById('statusMessage').innerText = "🔴 Recording active... Moving around logs live readings!";
+
+                // Start active continuous tracking
+                recordingWatchId = navigator.geolocation.watchPosition(
+                    async (pos) => {
+                        const selectedCarrier = document.getElementById('carrierSelect').value;
+                        
+                        // Use currently selected carrier or default to ESP32 Prototype
+                        const targetCarrier = (selectedCarrier !== 'ALL') ? selectedCarrier : "ESP32 Prototype";
+
+                        const payload = {
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                            rssi: Math.floor(Math.random() * 41) - 100, // Simulated RSSI value (-100 to -60 dBm)
+                            carrier: targetCarrier,
+                            timestamp: new Date().toISOString()
+                        };
+
+                        try {
+                            const res = await fetch('/api/readings', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+
+                            if (res.ok) {
+                                document.getElementById('statusMessage').innerText = `🔴 Recording... Saved reading at (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`;
+                                fetchServerData();
+                            }
+                        } catch (err) {
+                            console.error("Recording payload failed:", err);
+                        }
+                    },
+                    (err) => {
+                        console.error("GPS Recording Error:", err);
+                        document.getElementById('statusMessage').innerText = "GPS error while recording.";
+                    },
+                    { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+                );
+
+            } else {
+                // STOP RECORDING
+                isRecording = false;
+                if (recordingWatchId !== null) {
+                    navigator.geolocation.clearWatch(recordingWatchId);
+                    recordingWatchId = null;
+                }
+                btn.innerText = "▶️ Start Continuous Recording";
+                btn.className = "action-btn btn-start";
+                document.getElementById('statusMessage').innerText = "⏹️ Recording stopped. All points saved.";
+            }
         }
 
         // Start initialization
