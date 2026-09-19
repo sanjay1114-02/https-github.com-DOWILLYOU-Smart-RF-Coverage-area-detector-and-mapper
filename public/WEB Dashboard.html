@@ -3,168 +3,374 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RF Coverage Heatmap Dashboard</title>
+    <meta name="referrer" content="no-referrer-when-downgrade" />
+    <title>RF Signal Mapper & Live Coverage</title>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
+
     <style>
-        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-        #map { height: 100vh; width: 100vw; }
-        
-        .control-panel {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            max-width: 300px;
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; }
+        #map { height: calc(100vh - 160px); width: 100vw; }
+
+        /* Bottom Control Panel UI */
+        .bottom-panel {
+            height: 160px;
+            width: 100vw;
+            background: #1e1e24;
+            border-top: 2px solid #333;
+            display: flex;
+            flex-direction: column;
+            padding: 12px 20px;
+            justify-content: space-between;
         }
-        
-        .btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
+
+        .mode-tabs {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .tabs-left {
+            display: flex;
+            gap: 10px;
+        }
+
+        .tab-btn {
+            background: #2a2a35;
+            color: #aaa;
+            border: 1px solid #444;
+            padding: 6px 16px;
+            border-radius: 20px;
             cursor: pointer;
-            width: 100%;
-            margin-top: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
         }
-        .btn:hover { background: #0056b3; }
-        .stat-box { font-size: 14px; margin-bottom: 5px; }
+
+        .tab-btn.active {
+            background: #007bff;
+            color: #fff;
+            border-color: #007bff;
+        }
+
+        /* Carrier Selector Dropdown styling */
+        .carrier-filter-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #141419;
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid #333;
+        }
+
+        .carrier-select {
+            background: #1e1e24;
+            color: #00d2ff;
+            border: 1px solid #444;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .metrics-grid {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background: #141419;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .metric-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .metric-label { font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 4px; }
+        .metric-value { font-size: 16px; font-weight: bold; color: #00d2ff; }
+
+        .actions-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-upload { background: #28a745; }
+        .btn-upload:hover { background: #218838; }
+        .btn-sync { background: #007bff; }
+        .btn-sync:hover { background: #0056b3; }
+
+        .status-text { font-size: 12px; color: #bbb; font-style: italic; }
     </style>
 </head>
 <body>
 
     <div id="map"></div>
 
-    <div class="control-panel">
-        <h3>RF Signal Mapper</h3>
-        <div class="stat-box"><strong>Total Readings:</strong> <span id="count">0</span></div>
-        <div class="stat-box"><strong>Avg Signal:</strong> <span id="avgRssi">-</span> dBm</div>
-        
-        <button class="btn" onclick="fetchServerData()">Sync Server Data</button>
-        <button class="btn" style="background:#28a745;" onclick="exportLocalStorage()">Export JSON Backup</button>
-        <button class="btn" style="background:#dc3545;" onclick="clearLocalCache()">Clear Cache</button>
+    <!-- Bottom Full-Width Dashboard -->
+    <div class="bottom-panel">
+        <div class="mode-tabs">
+            <div class="tabs-left">
+                <button id="tab-user" class="tab-btn active" onclick="switchMode('user')">🗺️ Map User Mode</button>
+                <button id="tab-collector" class="tab-btn" onclick="switchMode('collector')">📡 Take readings & upload to cloud</button>
+            </div>
+
+            <!-- Provider Switcher Options -->
+            <div id="carrierFilterWrapper" class="carrier-filter-container">
+                <span style="font-size: 12px; color: #aaa;">📶 Select Provider:</span>
+                <select id="carrierSelect" class="carrier-select" onchange="filterMapByCarrier()">
+                    <option value="ALL">All Providers (Combined)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <span class="metric-label">Active Provider View</span>
+                <span id="carrierName" class="metric-value">All Networks</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Signal Strength</span>
+                <span id="signalStrength" class="metric-value">- dBm</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Nearest Strong Signal</span>
+                <span id="nearestDistance" class="metric-value">Calculating...</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Filtered Cloud Points</span>
+                <span id="totalPoints" class="metric-value">0</span>
+            </div>
+        </div>
+
+        <div class="actions-row">
+            <span id="statusMessage" class="status-text">Status: Ready</span>
+            <div>
+                <button id="uploadBtn" class="action-btn btn-upload" style="display:none;" onclick="captureAndUpload()">📤 Record & Upload to Cloud</button>
+                <button class="action-btn btn-sync" onclick="fetchServerData()">🔄 Sync Map</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Leaflet JS -->
+    <!-- Leaflet & Heatmap Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Leaflet Heatmap Plugin -->
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
     <script>
-        // Initialize Map (Default centered near modern coordinates)
-        const map = L.map('map').setView([11.0168, 76.9558], 13);
+        let currentMode = 'user';
+        let allReadings = [];
+        let userLocationMarker = null;
 
-        // Load OpenStreetMap tiles
+        // Initialize Map
+        const map = L.map('map').setView([11.0168, 76.9558], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // Initialize Heatmap layer
-        let heatLayer = L.heatLayer([], {
-            radius: 25,
-            blur: 15,
-            maxZoom: 17,
-            gradient: {
-                0.2: 'red',     // Weak / Bad signal
-                0.5: 'yellow',  // Fair signal
-                0.8: 'lime',    // Good signal
-                1.0: 'green'    // Excellent signal
-            }
-        }).addTo(map);
+        let heatLayer = L.heatLayer([], { radius: 25, blur: 15, maxZoom: 17 }).addTo(map);
 
-        // Normalized RSSI (-110 dBm = 0 intensity, -50 dBm = 1 intensity)
         function normalizeRssi(rssi) {
-            const min = -110;
-            const max = -50;
-            let norm = (rssi - min) / (max - min);
-            return Math.max(0.1, Math.min(1.0, norm));
+            const min = -110, max = -50;
+            return Math.max(0.1, Math.min(1.0, (rssi - min) / (max - min)));
         }
 
-        // Save Data to Local Device Storage (Browser LocalStorage)
-        function saveToDeviceStorage(readings) {
-            localStorage.setItem('rf_readings_backup', JSON.stringify(readings));
+        // Calculate distance between two coordinates in meters (Haversine Formula)
+        function getDistanceMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const rad = Math.PI / 180;
+            const dLat = (lat2 - lat1) * rad;
+            const dLon = (lon2 - lon1) * rad;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * rad) * Math.cos(lat2 * rad) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
-        // Load Data from Local Device Storage
-        function getDeviceStorageData() {
-            const data = localStorage.getItem('rf_readings_backup');
-            return data ? JSON.parse(data) : [];
-        }
+        // Find nearest strong signal point (>= -70 dBm) based on current carrier filter
+        function calculateNearestStrongSignal(userLat, userLng) {
+            const selectedCarrier = document.getElementById('carrierSelect').value;
+            
+            let filteredReadings = allReadings;
+            if (selectedCarrier !== 'ALL') {
+                filteredReadings = allReadings.filter(r => (r.carrier || "ESP32 Prototype") === selectedCarrier);
+            }
 
-        // Process and Render Data onto Map
-        function renderData(readings) {
-            if (!readings || readings.length === 0) return;
+            const strongPoints = filteredReadings.filter(r => r.rssi >= -70);
+            if (strongPoints.length === 0) return 'No strong signals nearby';
 
-            const heatPoints = [];
-            let totalRssi = 0;
-
-            readings.forEach(item => {
-                const intensity = normalizeRssi(item.rssi);
-                heatPoints.push([item.lat, item.lng, intensity]);
-                totalRssi += item.rssi;
-
-                // Optional: Place small circle markers
-                L.circleMarker([item.lat, item.lng], {
-                    radius: 4,
-                    color: intensity > 0.5 ? 'green' : 'red',
-                    fillOpacity: 0.6
-                }).bindPopup(`<b>RSSI:</b> ${item.rssi} dBm<br><b>Time:</b> ${item.timestamp}`)
-                  .addTo(map);
+            let minDistance = Infinity;
+            strongPoints.forEach(pt => {
+                const dist = getDistanceMeters(userLat, userLng, pt.lat, pt.lng);
+                if (dist < minDistance) minDistance = dist;
             });
 
-            // Update Heatmap
-            heatLayer.setLatLngs(heatPoints);
-
-            // Update Dashboard Analytics
-            document.getElementById('count').innerText = readings.length;
-            document.getElementById('avgRssi').innerText = (totalRssi / readings.length).toFixed(1);
-
-            // Center Map around last reading
-            const last = readings[readings.length - 1];
-            map.panTo([last.lat, last.lng]);
-
-            // Save copy to browser local storage
-            saveToDeviceStorage(readings);
+            return minDistance < 1000 
+                ? `${Math.round(minDistance)} meters away` 
+                : `${(minDistance / 1000).toFixed(1)} km away`;
         }
 
-        // Fetch from Local Node.js Server
-        async function fetchServerData() {
-            try {
-                const res = await fetch('http://localhost:3000/api/readings');
-                const data = await res.json();
-                renderData(data);
-            } catch (err) {
-                console.warn('Local server unreachable. Loading from browser storage cache.');
-                const cachedData = getDeviceStorageData();
-                renderData(cachedData);
+        // Populate carrier dropdown dynamically with available carriers from DB
+        function updateCarrierDropdown() {
+            const selectElem = document.getElementById('carrierSelect');
+            const currentVal = selectElem.value;
+            
+            // Extract unique carrier names
+            const carriers = new Set();
+            allReadings.forEach(r => {
+                if (r.carrier) carriers.add(r.carrier);
+                else carriers.add("ESP32 Prototype");
+            });
+
+            // Rebuild option list
+            selectElem.innerHTML = `<option value="ALL">All Providers (Combined)</option>`;
+            carriers.forEach(carrier => {
+                const option = document.createElement('option');
+                option.value = carrier;
+                option.textContent = carrier;
+                selectElem.appendChild(option);
+            });
+
+            // Restore selection if still valid
+            if (carriers.has(currentVal) || currentVal === 'ALL') {
+                selectElem.value = currentVal;
             }
         }
 
-        // Download local cache file
-        function exportLocalStorage() {
-            const data = localStorage.getItem('rf_readings_backup') || '[]';
-            const blob = new Blob([data], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `rf_coverage_backup_${Date.now()}.json`;
-            a.click();
+        // Filter and re-render heatmap layer based on selected provider
+        function filterMapByCarrier() {
+            const selectedCarrier = document.getElementById('carrierSelect').value;
+            
+            let filtered = allReadings;
+            if (selectedCarrier !== 'ALL') {
+                filtered = allReadings.filter(r => (r.carrier || "ESP32 Prototype") === selectedCarrier);
+            }
+
+            const heatPoints = filtered.map(r => [r.lat, r.lng, normalizeRssi(r.rssi)]);
+            heatLayer.setLatLngs(heatPoints);
+
+            document.getElementById('totalPoints').innerText = filtered.length;
+            document.getElementById('carrierName').innerText = selectedCarrier === 'ALL' ? 'All Networks' : selectedCarrier;
+
+            if (filtered.length > 0) {
+                const last = filtered[filtered.length - 1];
+                document.getElementById('signalStrength').innerText = `${last.rssi} dBm`;
+            } else {
+                document.getElementById('signalStrength').innerText = `- dBm`;
+            }
+
+            // Recalculate distance metric for current user position
+            if (userLocationMarker) {
+                const pos = userLocationMarker.getLatLng();
+                document.getElementById('nearestDistance').innerText = calculateNearestStrongSignal(pos.lat, pos.lng);
+            }
         }
 
-        function clearLocalCache() {
-            localStorage.removeItem('rf_readings_backup');
-            location.reload();
+        // Switch Dashboard Modes
+        function switchMode(mode) {
+            currentMode = mode;
+            document.getElementById('tab-user').classList.toggle('active', mode === 'user');
+            document.getElementById('tab-collector').classList.toggle('active', mode === 'collector');
+            document.getElementById('uploadBtn').style.display = mode === 'collector' ? 'inline-block' : 'none';
+
+            if (mode === 'collector') {
+                document.getElementById('statusMessage').innerText = "Collector Mode: Ready to log hardware reading.";
+            } else {
+                document.getElementById('statusMessage').innerText = "User Mode: Browsing signal coverage.";
+            }
         }
 
-        // Load data on start
+        // Locate user and update metrics
+        function trackUserLocation() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.watchPosition(pos => {
+                    const { latitude, longitude } = pos.coords;
+                    
+                    if (!userLocationMarker) {
+                        userLocationMarker = L.marker([latitude, longitude]).addTo(map).bindPopup("Your Location");
+                    } else {
+                        userLocationMarker.setLatLng([latitude, longitude]);
+                    }
+
+                    // Update UI metrics
+                    const nearestStr = calculateNearestStrongSignal(latitude, longitude);
+                    document.getElementById('nearestDistance').innerText = nearestStr;
+                });
+            }
+        }
+
+        // Fetch data from Node.js server
+        async function fetchServerData() {
+            try {
+                const res = await fetch('/api/readings');
+                allReadings = await res.json();
+                
+                updateCarrierDropdown();
+                filterMapByCarrier();
+                
+                document.getElementById('statusMessage').innerText = "Data updated from server.";
+            } catch (err) {
+                document.getElementById('statusMessage').innerText = "Server offline. Showing local data.";
+            }
+        }
+
+        // Capture & Upload Reading (Collector Mode)
+        function captureAndUpload() {
+            if (!("geolocation" in navigator)) {
+                alert("Geolocation not supported.");
+                return;
+            }
+
+            document.getElementById('statusMessage').innerText = "Capturing location & signal...";
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const selectedCarrier = document.getElementById('carrierSelect').value;
+                
+                const payload = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    rssi: Math.floor(Math.random() * 41) - 100, // Simulated RSSI in web app
+                    carrier: selectedCarrier !== 'ALL' ? selectedCarrier : "Manual Entry",
+                    timestamp: new Date().toISOString()
+                };
+
+                try {
+                    const res = await fetch('/api/readings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (res.ok) {
+                        document.getElementById('statusMessage').innerText = "Reading uploaded successfully!";
+                        fetchServerData();
+                    }
+                } catch (err) {
+                    document.getElementById('statusMessage').innerText = "Failed to upload reading to server.";
+                }
+            });
+        }
+
+        // Start initialization
         fetchServerData();
+        trackUserLocation();
     </script>
 </body>
 </html>
