@@ -10,11 +10,37 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
+        :root {
+            /* Dark Theme Variables (Default) */
+            --bg-panel: #1e1e24;
+            --bg-card: #141419;
+            --bg-button: #2a2a35;
+            --border-color: #333333;
+            --border-card: #444444;
+            --text-primary: #ffffff;
+            --text-secondary: #888888;
+            --text-subtle: #aaaaaa;
+            --accent-color: #00d2ff;
+        }
+
+        body.light-theme {
+            /* Light Theme Variables */
+            --bg-panel: #ffffff;
+            --bg-card: #f4f5f7;
+            --bg-button: #e9ecef;
+            --border-color: #cccccc;
+            --border-card: #dddddd;
+            --text-primary: #121212;
+            --text-secondary: #666666;
+            --text-subtle: #555555;
+            --accent-color: #0056b3;
+        }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             background: #121212; 
-            color: #ffffff; 
+            color: var(--text-primary); 
             overflow: hidden;
             height: 100vh;
             width: 100vw;
@@ -47,11 +73,12 @@
         .search-box {
             flex: 1;
             display: flex;
-            background: #1e1e24;
-            border: 1px solid #333;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            transition: background 0.3s, border-color 0.3s;
         }
 
         .search-input {
@@ -59,27 +86,27 @@
             background: transparent;
             border: none;
             padding: 10px 14px;
-            color: #fff;
+            color: var(--text-primary);
             font-size: 14px;
             outline: none;
         }
 
         .search-btn, .theme-toggle-btn {
-            background: #2a2a35;
+            background: var(--bg-button);
             border: none;
-            color: #00d2ff;
+            color: var(--accent-color);
             padding: 0 14px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background 0.2s;
+            transition: background 0.2s, color 0.2s;
         }
 
         .theme-toggle-btn {
             border-radius: 8px;
-            border: 1px solid #333;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
         }
 
         .search-btn:hover, .theme-toggle-btn:hover { background: #007bff; color: #fff; }
@@ -96,9 +123,9 @@
         }
 
         .icon-btn {
-            background: #1e1e24;
-            color: #00d2ff;
-            border: 1px solid #333;
+            background: var(--bg-panel);
+            color: var(--accent-color);
+            border: 1px solid var(--border-color);
             border-radius: 50%;
             width: 44px;
             height: 44px;
@@ -106,7 +133,7 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             transition: all 0.2s ease;
         }
 
@@ -118,13 +145,14 @@
 
         /* Bottom Dashboard Panel */
         .bottom-panel {
-            background: #1e1e24;
-            border-top: 1px solid #333;
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border-color);
             padding: 12px 16px;
             display: flex;
             flex-direction: column;
             gap: 12px;
             z-index: 1001;
+            transition: background 0.3s, border-color 0.3s;
         }
 
         .panel-header {
@@ -140,23 +168,25 @@
         }
 
         .carrier-select {
-            background: #141419;
-            color: #00d2ff;
-            border: 1px solid #444;
+            background: var(--bg-card);
+            color: var(--accent-color);
+            border: 1px solid var(--border-card);
             padding: 6px 10px;
             border-radius: 6px;
             font-size: 13px;
             font-weight: 600;
             outline: none;
+            transition: background 0.3s, border-color 0.3s, color 0.3s;
         }
 
         .metrics-wrapper {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 8px;
-            background: #141419;
+            background: var(--bg-card);
             padding: 10px;
             border-radius: 8px;
+            transition: background 0.3s;
         }
 
         .metric-card {
@@ -167,8 +197,8 @@
             text-align: center;
         }
 
-        .metric-label { font-size: 10px; color: #888; text-transform: uppercase; margin-bottom: 2px; }
-        .metric-value { font-size: 14px; font-weight: 700; color: #00d2ff; }
+        .metric-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px; }
+        .metric-value { font-size: 14px; font-weight: 700; color: var(--accent-color); }
 
         /* Compass Visual */
         .compass-container {
@@ -211,7 +241,7 @@
         .btn-sync { background: #007bff; }
         .btn-sync:hover { background: #0056b3; }
 
-        .status-text { font-size: 11px; color: #aaa; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .status-text { font-size: 11px; color: var(--text-subtle); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         /* Media Queries for Mobile Responsiveness */
         @media (max-width: 600px) {
@@ -235,7 +265,7 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 </button>
             </div>
-            <button class="theme-toggle-btn" onclick="toggleNightView()" title="Toggle Night View">
+            <button class="theme-toggle-btn" onclick="toggleUITheme()" title="Toggle Interface Theme">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             </button>
         </div>
@@ -258,7 +288,7 @@
     <div class="bottom-panel">
         <div class="panel-header">
             <div class="carrier-filter-container">
-                <span style="font-size: 12px; color: #aaa; font-weight: 600;">Provider:</span>
+                <span style="font-size: 12px; color: var(--text-subtle); font-weight: 600;">Provider:</span>
                 <select id="carrierSelect" class="carrier-select" onchange="filterMapByCarrier()">
                     <option value="ALL">All Providers</option>
                     <option value="Jio">Jio</option>
@@ -266,7 +296,7 @@
                     <option value="Vodafone Vi">Vodafone Vi</option>
                 </select>
             </div>
-            <span id="currentModeLabel" style="font-size: 11px; color: #00d2ff; font-weight: 700; text-transform: uppercase;">User View</span>
+            <span id="currentModeLabel" style="font-size: 11px; color: var(--accent-color); font-weight: 700; text-transform: uppercase;">User View</span>
         </div>
 
         <div class="metrics-wrapper">
@@ -281,8 +311,8 @@
             <div class="metric-card">
                 <span class="metric-label">Direction</span>
                 <div class="compass-container">
-                    <svg id="compassArrow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="2">
-                        <polygon points="12,2 19,21 12,17 5,21" fill="#00d2ff"/>
+                    <svg id="compassArrow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2">
+                        <polygon points="12,2 19,21 12,17 5,21" fill="var(--accent-color)"/>
                     </svg>
                 </div>
             </div>
@@ -313,7 +343,7 @@
 
     <script>
         let currentMode = 'user'; // 'user' or 'collector'
-        let isNightView = true;
+        let isDarkMode = true;
         let allReadings = [];
         let userLocationMarker = null;
         let currentUserCoords = null;
@@ -321,32 +351,23 @@
         let isRecording = false;
         let recordingWatchId = null;
 
-        // Initialize Map & Tile Layers
+        // Initialize Map with permanently light tile layer
         const map = L.map('map', { zoomControl: false }).setView([11.0168, 76.9558], 14);
 
-        const darkTileLayer = L.tileLayer('https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19,
-    subdomains: 'abcd',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-});
-
-        const lightTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-});
-
-        darkTileLayer.addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
         let heatLayer = L.heatLayer([], { radius: 25, blur: 15, maxZoom: 17 }).addTo(map);
 
-        function toggleNightView() {
-            isNightView = !isNightView;
-            if (isNightView) {
-                map.removeLayer(lightTileLayer);
-                map.addLayer(darkTileLayer);
+        // Toggle UI theme between Dark and Light mode
+        function toggleUITheme() {
+            isDarkMode = !isDarkMode;
+            if (isDarkMode) {
+                document.body.classList.remove('light-theme');
             } else {
-                map.removeLayer(darkTileLayer);
-                map.addLayer(lightTileLayer);
+                document.body.classList.add('light-theme');
             }
         }
 
@@ -509,24 +530,60 @@
         }
 
         // Search Location using OpenStreetMap Nominatim
-        async function searchLocation() {
-            const query = document.getElementById('searchInput').value;
-            if (!query) return;
+       async function searchLocation() {
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query) return;
 
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
-                const data = await res.json();
-                if (data && data.length > 0) {
-                    const { lat, lon } = data[0];
-                    map.flyTo([parseFloat(lat), parseFloat(lon)], 14);
-                } else {
-                    alert("Location not found.");
-                }
-            } catch (err) {
-                console.error("Search error:", err);
+    const statusEl = document.getElementById('statusMessage');
+    statusEl.innerText = "Searching location & analyzing signal...";
+
+    try {
+        // Query Nominatim API with structured output
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+        const data = await res.json();
+
+        if (data && data.length > 0) {
+            const searchLat = parseFloat(data[0].lat);
+            const searchLon = parseFloat(data[0].lon);
+
+            // 1. Pan map to location
+            map.flyTo([searchLat, searchLon], 15, { animate: true, duration: 1.5 });
+
+            // 2. Add temporary search marker
+            if (window.searchMarker) map.removeLayer(window.searchMarker);
+            window.searchMarker = L.circleMarker([searchLat, searchLon], {
+                radius: 10,
+                color: 'var(--accent-color)',
+                fillColor: 'var(--accent-color)',
+                fillOpacity: 0.4
+            }).addTo(map).bindPopup(`<b>${data[0].display_name.split(',')[0]}</b><br>Analyzing signal...`).openPopup();
+
+            // 3. Compute RF Metrics around searched location (within 1km radius)
+            const nearbyReadings = allReadings.filter(r => {
+                const dist = getDistanceMeters(searchLat, searchLon, r.lat, r.lng);
+                return dist <= 1000; // 1 km radius
+            });
+
+            if (nearbyReadings.length > 0) {
+                const avgRssi = Math.round(nearbyReadings.reduce((sum, r) => sum + r.rssi, 0) / nearbyReadings.length);
+                statusEl.innerText = `Search Result: ${data[0].display_name.split(',')[0]} (${nearbyReadings.length} readings nearby, Avg RSSI: ${avgRssi} dBm)`;
+                window.searchMarker.setPopupContent(`<b>${data[0].display_name.split(',')[0]}</b><br>Avg Signal: <b>${avgRssi} dBm</b> (${nearbyReadings.length} samples)`);
+            } else {
+                statusEl.innerText = `Search Result: ${data[0].display_name.split(',')[0]} (No local RF data captured yet)`;
             }
-        }
 
+            // 4. Update Compass to point towards nearest strong signal from searched point
+            updateNearestSignalAndCompass(searchLat, searchLon);
+
+        } else {
+            alert("Location not found. Try a broader search term.");
+            statusEl.innerText = "Status: Ready";
+        }
+    } catch (err) {
+        console.error("Search error:", err);
+        statusEl.innerText = "Error searching location.";
+    }
+}
         // Continuous Data Recording
         function toggleRecording() {
             const btn = document.getElementById('recordingBtn');
