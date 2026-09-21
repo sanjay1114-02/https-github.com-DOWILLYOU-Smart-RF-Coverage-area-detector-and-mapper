@@ -12,7 +12,8 @@ app.use(express.json());
 
 // Serve static frontend files from 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
-
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'WEB Dashboard.html'));});
 // Ensure local data file exists
 if (!fs.existsSync(DATA_FILE)) {
     fs.writeFileSync(DATA_FILE, JSON.stringify([]));
