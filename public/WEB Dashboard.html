@@ -2,120 +2,158 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="referrer" content="no-referrer-when-downgrade" />
-    <title>RF Signal Mapper & Live Coverage</title>
+    <title>RF Signal Mapper</title>
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #fff; }
-        
-        #map-container {
-            position: relative;
-            height: calc(100vh - 160px);
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: #121212; 
+            color: #ffffff; 
+            overflow: hidden;
+            height: 100vh;
             width: 100vw;
+            display: flex;
+            flex-direction: column;
         }
 
-        #map { height: 100%; width: 100%; }
+        /* Map Container */
+        #map-container {
+            position: relative;
+            flex: 1;
+            width: 100%;
+        }
 
-        /* Floating Recenter Location Button (GMap Style) */
-        .recenter-btn {
+        #map { height: 100%; width: 100%; z-index: 1; }
+
+        /* Top Bar Floating Controls */
+        .top-controls {
             position: absolute;
-            bottom: 25px;
-            right: 15px;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 1000;
+            display: flex;
+            gap: 8px;
+            width: calc(100% - 24px);
+            max-width: 500px;
+        }
+
+        .search-box {
+            flex: 1;
+            display: flex;
+            background: #1e1e24;
+            border: 1px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        .search-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 10px 14px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .search-btn, .theme-toggle-btn {
+            background: #2a2a35;
+            border: none;
+            color: #00d2ff;
+            padding: 0 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .theme-toggle-btn {
+            border-radius: 8px;
+            border: 1px solid #333;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        .search-btn:hover, .theme-toggle-btn:hover { background: #007bff; color: #fff; }
+
+        /* Action Controls (Right Bottom Stack) */
+        .floating-stack {
+            position: absolute;
+            bottom: 20px;
+            right: 16px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .icon-btn {
             background: #1e1e24;
             color: #00d2ff;
-            border: 2px solid #007bff;
+            border: 1px solid #333;
             border-radius: 50%;
             width: 44px;
             height: 44px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
             cursor: pointer;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
             transition: all 0.2s ease;
         }
-        .recenter-btn:hover {
+
+        .icon-btn:hover {
             background: #007bff;
             color: #fff;
-            transform: scale(1.08);
+            transform: scale(1.05);
         }
 
-        /* Bottom Control Panel UI */
+        /* Bottom Dashboard Panel */
         .bottom-panel {
-            height: 160px;
-            width: 100vw;
             background: #1e1e24;
-            border-top: 2px solid #333;
+            border-top: 1px solid #333;
+            padding: 12px 16px;
             display: flex;
             flex-direction: column;
-            padding: 12px 20px;
-            justify-content: space-between;
+            gap: 12px;
+            z-index: 1001;
         }
 
-        .mode-tabs {
+        .panel-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
         }
 
-        .tabs-left {
-            display: flex;
-            gap: 10px;
-        }
-
-        .tab-btn {
-            background: #2a2a35;
-            color: #aaa;
-            border: 1px solid #444;
-            padding: 6px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            transition: all 0.2s ease;
-        }
-
-        .tab-btn.active {
-            background: #007bff;
-            color: #fff;
-            border-color: #007bff;
-        }
-
-        /* Carrier Selector Dropdown styling */
         .carrier-filter-container {
             display: flex;
             align-items: center;
             gap: 8px;
-            background: #141419;
-            padding: 4px 12px;
-            border-radius: 20px;
-            border: 1px solid #333;
         }
 
         .carrier-select {
-            background: #1e1e24;
+            background: #141419;
             color: #00d2ff;
             border: 1px solid #444;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: bold;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
             outline: none;
-            cursor: pointer;
         }
 
-        .metrics-grid {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
+        .metrics-wrapper {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
             background: #141419;
             padding: 10px;
             border-radius: 8px;
@@ -125,27 +163,47 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: center;
+            text-align: center;
         }
 
-        .metric-label { font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 4px; }
-        .metric-value { font-size: 16px; font-weight: bold; color: #00d2ff; }
+        .metric-label { font-size: 10px; color: #888; text-transform: uppercase; margin-bottom: 2px; }
+        .metric-value { font-size: 14px; font-weight: 700; color: #00d2ff; }
+
+        /* Compass Visual */
+        .compass-container {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #compassArrow {
+            transform-origin: center;
+            transition: transform 0.4s ease-out;
+        }
 
         .actions-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .action-btn {
-            padding: 8px 16px;
+            padding: 8px 14px;
             border-radius: 6px;
             border: none;
             color: white;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
+
         .btn-start { background: #28a745; }
         .btn-start:hover { background: #218838; }
         .btn-stop { background: #dc3545; }
@@ -153,53 +211,83 @@
         .btn-sync { background: #007bff; }
         .btn-sync:hover { background: #0056b3; }
 
-        .status-text { font-size: 12px; color: #bbb; font-style: italic; }
+        .status-text { font-size: 11px; color: #aaa; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Media Queries for Mobile Responsiveness */
+        @media (max-width: 600px) {
+            .metrics-wrapper {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            .metric-value { font-size: 13px; }
+            .bottom-panel { padding: 10px 12px; }
+        }
     </style>
 </head>
 <body>
 
     <div id="map-container">
+        <!-- Floating Top Search Bar & Theme Switcher -->
+        <div class="top-controls">
+            <div class="search-box">
+                <input type="text" id="searchInput" class="search-input" placeholder="Search location..." onkeydown="if(event.key==='Enter') searchLocation()">
+                <button class="search-btn" onclick="searchLocation()" title="Search">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </button>
+            </div>
+            <button class="theme-toggle-btn" onclick="toggleNightView()" title="Toggle Night View">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+        </div>
+
         <div id="map"></div>
-        <!-- Google Maps Style Recenter Location Button -->
-        <button class="recenter-btn" onclick="recenterToUserLocation()" title="Re-center map to my location">🎯</button>
+
+        <!-- Floating Control Buttons (Right Side) -->
+        <div class="floating-stack">
+            <button id="modeToggleBtn" class="icon-btn" onclick="toggleMode()" title="Switch Mode">
+                <!-- Waypoint Icon default (Switch to Contributor Mode) -->
+                <svg id="modeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </button>
+            <button class="icon-btn" onclick="recenterToUserLocation()" title="Re-center Location">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+            </button>
+        </div>
     </div>
 
-    <!-- Bottom Full-Width Dashboard -->
+    <!-- Bottom Dashboard Panel -->
     <div class="bottom-panel">
-        <div class="mode-tabs">
-            <div class="tabs-left">
-                <button id="tab-user" class="tab-btn active" onclick="switchMode('user')">🗺️ Map User Mode</button>
-                <button id="tab-collector" class="tab-btn" onclick="switchMode('collector')">📡 Take readings & upload to cloud</button>
-            </div>
-
-            <!-- Provider Switcher Options -->
-            <div id="carrierFilterWrapper" class="carrier-filter-container">
-                <span style="font-size: 12px; color: #aaa;">📶 Select Provider:</span>
+        <div class="panel-header">
+            <div class="carrier-filter-container">
+                <span style="font-size: 12px; color: #aaa; font-weight: 600;">Provider:</span>
                 <select id="carrierSelect" class="carrier-select" onchange="filterMapByCarrier()">
-                    <option value="ALL">All Providers (Combined)</option>
+                    <option value="ALL">All Providers</option>
                     <option value="Jio">Jio</option>
                     <option value="Airtel">Airtel</option>
                     <option value="Vodafone Vi">Vodafone Vi</option>
-                    <option value="ESP32 Prototype">ESP32 Prototype</option>
                 </select>
             </div>
+            <span id="currentModeLabel" style="font-size: 11px; color: #00d2ff; font-weight: 700; text-transform: uppercase;">User View</span>
         </div>
 
-        <div class="metrics-grid">
+        <div class="metrics-wrapper">
             <div class="metric-card">
-                <span class="metric-label">Active Provider View</span>
-                <span id="carrierName" class="metric-value">All Networks</span>
-            </div>
-            <div class="metric-card">
-                <span class="metric-label">Signal Strength</span>
+                <span class="metric-label">Signal RSSI</span>
                 <span id="signalStrength" class="metric-value">- dBm</span>
             </div>
             <div class="metric-card">
                 <span class="metric-label">Nearest Strong Signal</span>
-                <span id="nearestDistance" class="metric-value">Calculating...</span>
+                <span id="nearestDistance" class="metric-value">N/A</span>
             </div>
             <div class="metric-card">
-                <span class="metric-label">Filtered Cloud Points</span>
+                <span class="metric-label">Direction</span>
+                <div class="compass-container">
+                    <svg id="compassArrow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="2">
+                        <polygon points="12,2 19,21 12,17 5,21" fill="#00d2ff"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Filtered Points</span>
                 <span id="totalPoints" class="metric-value">0</span>
             </div>
         </div>
@@ -207,41 +295,66 @@
         <div class="actions-row">
             <span id="statusMessage" class="status-text">Status: Ready</span>
             <div>
-                <button id="recordingBtn" class="action-btn btn-start" style="display:none;" onclick="toggleRecording()">▶️ Start Continuous Recording</button>
-                <button class="action-btn btn-sync" onclick="fetchServerData()">🔄 Sync Map</button>
+                <button id="recordingBtn" class="action-btn btn-start" style="display:none;" onclick="toggleRecording()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                    <span>Record</span>
+                </button>
+                <button class="action-btn btn-sync" onclick="fetchServerData()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M2.5 16l1.2 0.8a10 10 0 0 0 18.8-4.3"/></svg>
+                    <span>Sync</span>
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Leaflet & Heatmap Scripts -->
+    <!-- Leaflet & Leaflet Heatmap Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
     <script>
-        let currentMode = 'user';
+        let currentMode = 'user'; // 'user' or 'collector'
+        let isNightView = true;
         let allReadings = [];
         let userLocationMarker = null;
         let currentUserCoords = null;
 
-        // Continuous Recording Variables
         let isRecording = false;
         let recordingWatchId = null;
 
-        // Initialize Map
-        const map = L.map('map').setView([11.0168, 76.9558], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // Initialize Map & Tile Layers
+        const map = L.map('map', { zoomControl: false }).setView([11.0168, 76.9558], 14);
+
+        const darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors © CARTO'
+        });
+
+        const lightTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+        });
+
+        darkTileLayer.addTo(map);
 
         let heatLayer = L.heatLayer([], { radius: 25, blur: 15, maxZoom: 17 }).addTo(map);
+
+        function toggleNightView() {
+            isNightView = !isNightView;
+            if (isNightView) {
+                map.removeLayer(lightTileLayer);
+                map.addLayer(darkTileLayer);
+            } else {
+                map.removeLayer(darkTileLayer);
+                map.addLayer(lightTileLayer);
+            }
+        }
 
         function normalizeRssi(rssi) {
             const min = -110, max = -50;
             return Math.max(0.1, Math.min(1.0, (rssi - min) / (max - min)));
         }
 
-        // Calculate distance between two coordinates in meters (Haversine Formula)
+        // Calculate Distance (Meters)
         function getDistanceMeters(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
             const rad = Math.PI / 180;
@@ -253,52 +366,79 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
-        // Recenter map back to current user position
+        // Calculate Bearing Angle (Degrees)
+        function getBearingDegrees(lat1, lon1, lat2, lon2) {
+            const rad = Math.PI / 180;
+            const phi1 = lat1 * rad, phi2 = lat2 * rad;
+            const deltaLambda = (lon2 - lon1) * rad;
+            const y = Math.sin(deltaLambda) * Math.cos(phi2);
+            const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+            const theta = Math.atan2(y, x);
+            return (theta * 180 / Math.PI + 360) % 360;
+        }
+
         function recenterToUserLocation() {
             if (currentUserCoords) {
                 map.flyTo([currentUserCoords.latitude, currentUserCoords.longitude], 16, { animate: true, duration: 1 });
             } else {
-                alert("Acquiring GPS location... Please wait a moment.");
+                alert("Acquiring GPS location...");
             }
         }
 
-        // Find nearest strong signal point (>= -70 dBm)
-        function calculateNearestStrongSignal(userLat, userLng) {
+        // Process Nearest Strong Signal Metrics & Compass Direction
+        function updateNearestSignalAndCompass(userLat, userLng) {
             const selectedCarrier = document.getElementById('carrierSelect').value;
-            
+            const compassEl = document.getElementById('compassArrow');
+
+            // Strictly filter by carrier
             let filteredReadings = allReadings;
             if (selectedCarrier !== 'ALL') {
-                filteredReadings = allReadings.filter(r => (r.carrier || "ESP32 Prototype") === selectedCarrier);
+                filteredReadings = allReadings.filter(r => r.carrier === selectedCarrier);
             }
 
+            // Strong signal defined as >= -70 dBm
             const strongPoints = filteredReadings.filter(r => r.rssi >= -70);
-            if (strongPoints.length === 0) return 'No strong signals nearby';
+
+            if (strongPoints.length === 0) {
+                document.getElementById('nearestDistance').innerText = 'None';
+                compassEl.style.transform = 'rotate(0deg)';
+                return;
+            }
 
             let minDistance = Infinity;
+            let nearestPoint = null;
+
             strongPoints.forEach(pt => {
                 const dist = getDistanceMeters(userLat, userLng, pt.lat, pt.lng);
-                if (dist < minDistance) minDistance = dist;
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestPoint = pt;
+                }
             });
 
-            return minDistance < 1000 
-                ? `${Math.round(minDistance)} meters away` 
-                : `${(minDistance / 1000).toFixed(1)} km away`;
+            if (nearestPoint) {
+                document.getElementById('nearestDistance').innerText = minDistance < 1000 
+                    ? `${Math.round(minDistance)} m` 
+                    : `${(minDistance / 1000).toFixed(1)} km`;
+
+                const bearing = getBearingDegrees(userLat, userLng, nearestPoint.lat, nearestPoint.lng);
+                compassEl.style.transform = `rotate(${Math.round(bearing)}deg)`;
+            }
         }
 
-        // Filter and re-render heatmap layer based on selected provider
+        // Refresh Heatmap & Panel Metrics Based on Filter
         function filterMapByCarrier() {
             const selectedCarrier = document.getElementById('carrierSelect').value;
             
             let filtered = allReadings;
             if (selectedCarrier !== 'ALL') {
-                filtered = allReadings.filter(r => (r.carrier || "ESP32 Prototype") === selectedCarrier);
+                filtered = allReadings.filter(r => r.carrier === selectedCarrier);
             }
 
             const heatPoints = filtered.map(r => [r.lat, r.lng, normalizeRssi(r.rssi)]);
             heatLayer.setLatLngs(heatPoints);
 
             document.getElementById('totalPoints').innerText = filtered.length;
-            document.getElementById('carrierName').innerText = selectedCarrier === 'ALL' ? 'All Networks' : selectedCarrier;
 
             if (filtered.length > 0) {
                 const last = filtered[filtered.length - 1];
@@ -307,31 +447,34 @@
                 document.getElementById('signalStrength').innerText = `- dBm`;
             }
 
-            // Recalculate distance metric for current user position
             if (currentUserCoords) {
-                document.getElementById('nearestDistance').innerText = calculateNearestStrongSignal(currentUserCoords.latitude, currentUserCoords.longitude);
+                updateNearestSignalAndCompass(currentUserCoords.latitude, currentUserCoords.longitude);
             }
         }
 
-        // Switch Dashboard Modes
-        function switchMode(mode) {
-            currentMode = mode;
-            document.getElementById('tab-user').classList.toggle('active', mode === 'user');
-            document.getElementById('tab-collector').classList.toggle('active', mode === 'collector');
-            
+        // Toggle Between User View Mode and Contributor Mode
+        function toggleMode() {
+            currentMode = (currentMode === 'user') ? 'collector' : 'user';
+            const modeIcon = document.getElementById('modeIcon');
             const recordBtn = document.getElementById('recordingBtn');
-            recordBtn.style.display = mode === 'collector' ? 'inline-block' : 'none';
+            const modeLabel = document.getElementById('currentModeLabel');
 
-            if (mode === 'collector') {
-                document.getElementById('statusMessage').innerText = isRecording 
-                    ? "Continuous Recording ACTIVE..." 
-                    : "Collector Mode: Press Start to log continuous data.";
+            if (currentMode === 'collector') {
+                // Set map icon for switching back to User View
+                modeIcon.innerHTML = `<path d="M1 6v14l6-3 6 3 6-3 4 2V4l-4-2-6 3-6-3-5 2zM7 5v13M13 8v13"/>`;
+                recordBtn.style.display = 'inline-flex';
+                modeLabel.innerText = "Contributor View";
+                document.getElementById('statusMessage').innerText = "Contributor Mode: Press Record to capture metrics.";
             } else {
-                document.getElementById('statusMessage').innerText = "User Mode: Browsing signal coverage.";
+                // Set waypoint icon for switching to Contributor View
+                modeIcon.innerHTML = `<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>`;
+                recordBtn.style.display = 'none';
+                modeLabel.innerText = "User View";
+                document.getElementById('statusMessage').innerText = "Status: Viewing map coverage.";
             }
         }
 
-        // Continuous location monitoring for current marker
+        // Location Tracking
         function trackUserLocation() {
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(pos => {
@@ -339,59 +482,74 @@
                     const { latitude, longitude } = pos.coords;
                     
                     if (!userLocationMarker) {
-                        userLocationMarker = L.marker([latitude, longitude]).addTo(map).bindPopup("Your Location");
+                        userLocationMarker = L.marker([latitude, longitude]).addTo(map);
                         map.setView([latitude, longitude], 15);
                     } else {
                         userLocationMarker.setLatLng([latitude, longitude]);
                     }
 
-                    document.getElementById('nearestDistance').innerText = calculateNearestStrongSignal(latitude, longitude);
+                    updateNearestSignalAndCompass(latitude, longitude);
                 }, err => {
                     console.warn("Geolocation warning:", err.message);
                 }, { enableHighAccuracy: true });
             }
         }
 
-        // Fetch data from Node.js server
+        // Fetch Server Data
         async function fetchServerData() {
             try {
                 const res = await fetch('/api/readings');
                 allReadings = await res.json();
                 filterMapByCarrier();
-                document.getElementById('statusMessage').innerText = "Data updated from server.";
+                document.getElementById('statusMessage').innerText = "Map data updated.";
             } catch (err) {
-                document.getElementById('statusMessage').innerText = "Server offline. Showing local data.";
+                document.getElementById('statusMessage').innerText = "Server offline. Showing cached readings.";
             }
         }
 
-        // Start/Stop Continuous Signal Recording
+        // Search Location using OpenStreetMap Nominatim
+        async function searchLocation() {
+            const query = document.getElementById('searchInput').value;
+            if (!query) return;
+
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    const { lat, lon } = data[0];
+                    map.flyTo([parseFloat(lat), parseFloat(lon)], 14);
+                } else {
+                    alert("Location not found.");
+                }
+            } catch (err) {
+                console.error("Search error:", err);
+            }
+        }
+
+        // Continuous Data Recording
         function toggleRecording() {
             const btn = document.getElementById('recordingBtn');
 
             if (!isRecording) {
-                // START RECORDING
                 if (!("geolocation" in navigator)) {
-                    alert("Geolocation is not supported by your browser.");
+                    alert("Geolocation unavailable.");
                     return;
                 }
 
                 isRecording = true;
-                btn.innerText = "⏹️ Stop Recording";
                 btn.className = "action-btn btn-stop";
-                document.getElementById('statusMessage').innerText = "🔴 Recording active... Moving around logs live readings!";
+                btn.querySelector('span').innerText = "Stop";
+                document.getElementById('statusMessage').innerText = "Logging continuous signal data...";
 
-                // Start active continuous tracking
                 recordingWatchId = navigator.geolocation.watchPosition(
                     async (pos) => {
                         const selectedCarrier = document.getElementById('carrierSelect').value;
-                        
-                        // Use currently selected carrier or default to ESP32 Prototype
-                        const targetCarrier = (selectedCarrier !== 'ALL') ? selectedCarrier : "ESP32 Prototype";
+                        const targetCarrier = (selectedCarrier !== 'ALL') ? selectedCarrier : "Airtel";
 
                         const payload = {
                             lat: pos.coords.latitude,
                             lng: pos.coords.longitude,
-                            rssi: Math.floor(Math.random() * 41) - 100, // Simulated RSSI value (-100 to -60 dBm)
+                            rssi: Math.floor(Math.random() * 41) - 100,
                             carrier: targetCarrier,
                             timestamp: new Date().toISOString()
                         };
@@ -404,34 +562,30 @@
                             });
 
                             if (res.ok) {
-                                document.getElementById('statusMessage').innerText = `🔴 Recording... Saved reading at (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`;
+                                document.getElementById('statusMessage').innerText = `Saved location: (${pos.coords.latitude.toFixed(3)}, ${pos.coords.longitude.toFixed(3)})`;
                                 fetchServerData();
                             }
                         } catch (err) {
-                            console.error("Recording payload failed:", err);
+                            console.error("Payload error:", err);
                         }
                     },
-                    (err) => {
-                        console.error("GPS Recording Error:", err);
-                        document.getElementById('statusMessage').innerText = "GPS error while recording.";
-                    },
+                    (err) => console.error("GPS error:", err),
                     { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
                 );
 
             } else {
-                // STOP RECORDING
                 isRecording = false;
                 if (recordingWatchId !== null) {
                     navigator.geolocation.clearWatch(recordingWatchId);
                     recordingWatchId = null;
                 }
-                btn.innerText = "▶️ Start Continuous Recording";
                 btn.className = "action-btn btn-start";
-                document.getElementById('statusMessage').innerText = "⏹️ Recording stopped. All points saved.";
+                btn.querySelector('span').innerText = "Record";
+                document.getElementById('statusMessage').innerText = "Recording stopped.";
             }
         }
 
-        // Start initialization
+        // Initialize application
         fetchServerData();
         trackUserLocation();
     </script>

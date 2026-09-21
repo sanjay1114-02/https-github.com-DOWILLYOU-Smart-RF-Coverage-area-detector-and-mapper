@@ -4,7 +4,7 @@ const path = require('path');
 const cors = require('cors');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'readings.json');
 
 app.use(cors());
@@ -18,7 +18,7 @@ if (!fs.existsSync(DATA_FILE)) {
     fs.writeFileSync(DATA_FILE, JSON.stringify([]));
 }
 
-// Safe Helper to read JSON file without crashing server
+// Helper to safely read JSON file
 function readReadingsFromFile() {
     try {
         const content = fs.readFileSync(DATA_FILE, 'utf8');
@@ -29,7 +29,7 @@ function readReadingsFromFile() {
     }
 }
 
-// POST: Endpoint to receive readings from ESP32, Phone, or Web Dashboard
+// POST: Endpoint to receive signal readings from mobile app or web client
 app.post('/api/readings', (req, res) => {
     const { lat, lng, rssi, carrier, timestamp } = req.body;
     
@@ -41,8 +41,7 @@ app.post('/api/readings', (req, res) => {
         lat: parseFloat(lat),
         lng: parseFloat(lng),
         rssi: parseFloat(rssi),
-        // Trim carrier or default to ESP32 Prototype
-        carrier: (carrier && carrier.trim()) ? carrier.trim() : "ESP32 Prototype",
+        carrier: (carrier && carrier.trim()) ? carrier.trim() : "Unknown Carrier",
         timestamp: timestamp || new Date().toISOString()
     };
 
@@ -51,16 +50,15 @@ app.post('/api/readings', (req, res) => {
     
     fs.writeFileSync(DATA_FILE, JSON.stringify(fileData, null, 2));
 
-    console.log('📡 Saved Reading:', newReading);
     res.status(201).json({ status: 'Success', reading: newReading });
 });
 
-// GET: Endpoint to fetch stored readings for dashboard
+// GET: Endpoint to fetch all stored readings
 app.get('/api/readings', (req, res) => {
     const fileData = readReadingsFromFile();
     res.json(fileData);
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
