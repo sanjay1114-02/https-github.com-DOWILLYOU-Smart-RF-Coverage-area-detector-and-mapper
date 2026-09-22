@@ -57,6 +57,37 @@
 
         #map { height: 100%; width: 100%; z-index: 1; }
 
+        /* Custom User Location Marker Styling */
+        .user-location-torch-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .torch-beam-svg {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            top: 0;
+            left: 0;
+            transform-origin: center center;
+            transition: transform 0.15s ease-out;
+            pointer-events: none;
+        }
+
+        .user-center-dot {
+            width: 14px;
+            height: 14px;
+            background-color: var(--accent-color);
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0, 210, 255, 0.8);
+            z-index: 2;
+        }
+
         /* Top Bar Floating Controls */
         .top-controls {
             position: absolute;
@@ -181,7 +212,7 @@
 
         .metrics-wrapper {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 8px;
             background: var(--bg-card);
             padding: 10px;
@@ -200,18 +231,63 @@
         .metric-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 2px; }
         .metric-value { font-size: 14px; font-weight: 700; color: var(--accent-color); }
 
-        /* Compass Visual */
-        .compass-container {
-            width: 32px;
-            height: 32px;
+        /* Separate Dedicated Torch View Direction Box (Center Bottom) */
+        .heading-display-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 8px;
+            padding: 8px 16px;
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 16px;
+            width: 100%;
+            box-shadow: inset 0 0 6px rgba(0,0,0,0.2);
         }
 
-        #compassArrow {
+        .compass-container {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        #torchCompassArrow {
             transform-origin: center;
-            transition: transform 0.4s ease-out;
+            transition: transform 0.15s ease-out;
+        }
+
+        .heading-text-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .heading-title {
+            font-size: 9px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .heading-value-container {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .heading-cardinal {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--accent-color);
+        }
+
+        .heading-degrees {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-subtle);
         }
 
         .actions-row {
@@ -246,10 +322,10 @@
         /* Media Queries for Mobile Responsiveness */
         @media (max-width: 600px) {
             .metrics-wrapper {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 10px;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 6px;
             }
-            .metric-value { font-size: 13px; }
+            .metric-value { font-size: 12px; }
             .bottom-panel { padding: 10px 12px; }
         }
     </style>
@@ -275,7 +351,6 @@
         <!-- Floating Control Buttons (Right Side) -->
         <div class="floating-stack">
             <button id="modeToggleBtn" class="icon-btn" onclick="toggleMode()" title="Switch Mode">
-                <!-- Waypoint Icon default (Switch to Contributor Mode) -->
                 <svg id="modeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             </button>
             <button class="icon-btn" onclick="recenterToUserLocation()" title="Re-center Location">
@@ -305,20 +380,30 @@
                 <span id="signalStrength" class="metric-value">- dBm</span>
             </div>
             <div class="metric-card">
-                <span class="metric-label">Nearest Strong Signal</span>
+                <span class="metric-label">Nearest Strong</span>
                 <span id="nearestDistance" class="metric-value">N/A</span>
-            </div>
-            <div class="metric-card">
-                <span class="metric-label">Direction</span>
-                <div class="compass-container">
-                    <svg id="compassArrow" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2">
-                        <polygon points="12,2 19,21 12,17 5,21" fill="var(--accent-color)"/>
-                    </svg>
-                </div>
             </div>
             <div class="metric-card">
                 <span class="metric-label">Filtered Points</span>
                 <span id="totalPoints" class="metric-value">0</span>
+            </div>
+        </div>
+
+        <!-- Separate Dedicated Center-Bottom Torch Direction View Box -->
+        <div class="heading-display-card" onclick="enableOrientationSensors()">
+            <div class="compass-container">
+                <svg id="torchCompassArrow" width="32" height="32" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="var(--border-card)" stroke-width="1.5" />
+                    <polygon points="12,3 16,12 12,9 8,12" fill="var(--accent-color)" />
+                    <polygon points="12,21 16,12 12,9 8,12" fill="var(--text-secondary)" opacity="0.4" />
+                </svg>
+            </div>
+            <div class="heading-text-group">
+                <span class="heading-title">User Facing Direction</span>
+                <div class="heading-value-container">
+                    <span id="headingCardinal" class="heading-cardinal">N</span>
+                    <span id="headingDegrees" class="heading-degrees">0°</span>
+                </div>
             </div>
         </div>
 
@@ -347,11 +432,12 @@
         let allReadings = [];
         let userLocationMarker = null;
         let currentUserCoords = null;
+        let userHeading = 0;
 
         let isRecording = false;
         let recordingWatchId = null;
 
-        // Initialize Map with permanently light tile layer
+        // Initialize Map
         const map = L.map('map', { zoomControl: false }).setView([11.0168, 76.9558], 14);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -360,6 +446,32 @@
         }).addTo(map);
 
         let heatLayer = L.heatLayer([], { radius: 25, blur: 15, maxZoom: 17 }).addTo(map);
+
+        // Custom Leaflet DivIcon with Torch Light Cone SVG Overlay
+        function createUserTorchIcon() {
+            const htmlContent = `
+                <div class="user-location-torch-container">
+                    <svg id="svgTorchCone" class="torch-beam-svg" viewBox="0 0 120 120">
+                        <defs>
+                            <radialGradient id="torchGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                                <stop offset="0%" stop-color="var(--accent-color)" stop-opacity="0.6"/>
+                                <stop offset="60%" stop-color="var(--accent-color)" stop-opacity="0.25"/>
+                                <stop offset="100%" stop-color="var(--accent-color)" stop-opacity="0"/>
+                            </radialGradient>
+                        </defs>
+                        <!-- 60-degree arc light cone extending outward towards top (heading 0 deg) -->
+                        <path d="M 60 60 L 30 8 A 60 60 0 0 1 90 8 Z" fill="url(#torchGradient)" />
+                    </svg>
+                    <div class="user-center-dot"></div>
+                </div>
+            `;
+            return L.divIcon({
+                html: htmlContent,
+                className: '',
+                iconSize: [120, 120],
+                iconAnchor: [60, 60]
+            });
+        }
 
         // Toggle UI theme between Dark and Light mode
         function toggleUITheme() {
@@ -388,17 +500,6 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
-        // Calculate Bearing Angle (Degrees)
-        function getBearingDegrees(lat1, lon1, lat2, lon2) {
-            const rad = Math.PI / 180;
-            const phi1 = lat1 * rad, phi2 = lat2 * rad;
-            const deltaLambda = (lon2 - lon1) * rad;
-            const y = Math.sin(deltaLambda) * Math.cos(phi2);
-            const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
-            const theta = Math.atan2(y, x);
-            return (theta * 180 / Math.PI + 360) % 360;
-        }
-
         function recenterToUserLocation() {
             if (currentUserCoords) {
                 map.flyTo([currentUserCoords.latitude, currentUserCoords.longitude], 16, { animate: true, duration: 1 });
@@ -407,45 +508,92 @@
             }
         }
 
-        // Process Nearest Strong Signal Metrics & Compass Direction
-        function updateNearestSignalAndCompass(userLat, userLng) {
-            const selectedCarrier = document.getElementById('carrierSelect').value;
-            const compassEl = document.getElementById('compassArrow');
+        // Convert Degrees to Compass Cardinal String
+        function degreesToCardinal(deg) {
+            const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+            const index = Math.round(deg / 45) % 8;
+            return cardinals[index];
+        }
 
-            // Strictly filter by carrier
+        // Update User Torch Cone and Dedicated Bottom Compass Display
+        function updateHeadingUI(heading) {
+            userHeading = Math.round(heading);
+
+            // Update Map Torch SVG Cone rotation
+            const torchConeEl = document.getElementById('svgTorchCone');
+            if (torchConeEl) {
+                torchConeEl.style.transform = `rotate(${userHeading}deg)`;
+            }
+
+            // Update Dedicated Center Bottom Direction Indicator
+            const torchCompassArrow = document.getElementById('torchCompassArrow');
+            if (torchCompassArrow) {
+                torchCompassArrow.style.transform = `rotate(${userHeading}deg)`;
+            }
+
+            document.getElementById('headingCardinal').innerText = degreesToCardinal(userHeading);
+            document.getElementById('headingDegrees').innerText = `${userHeading}°`;
+        }
+
+        // Device Orientation Setup for Torch-view tracking
+        function handleOrientation(event) {
+            let heading = null;
+
+            if (event.webkitCompassHeading) {
+                // iOS Compass Heading
+                heading = event.webkitCompassHeading;
+            } else if (event.alpha !== null) {
+                // Android / Standard Orientation API
+                heading = (360 - event.alpha) % 360;
+            }
+
+            if (heading !== null) {
+                updateHeadingUI(heading);
+            }
+        }
+
+        function enableOrientationSensors() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation, true);
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                window.addEventListener('deviceorientationabsolute', handleOrientation, true) ||
+                window.addEventListener('deviceorientation', handleOrientation, true);
+            }
+        }
+
+        // Process Nearest Strong Signal Metrics
+        function updateNearestSignal(userLat, userLng) {
+            const selectedCarrier = document.getElementById('carrierSelect').value;
+
             let filteredReadings = allReadings;
             if (selectedCarrier !== 'ALL') {
                 filteredReadings = allReadings.filter(r => r.carrier === selectedCarrier);
             }
 
-            // Strong signal defined as >= -70 dBm
             const strongPoints = filteredReadings.filter(r => r.rssi >= -70);
 
             if (strongPoints.length === 0) {
                 document.getElementById('nearestDistance').innerText = 'None';
-                compassEl.style.transform = 'rotate(0deg)';
                 return;
             }
 
             let minDistance = Infinity;
-            let nearestPoint = null;
-
             strongPoints.forEach(pt => {
                 const dist = getDistanceMeters(userLat, userLng, pt.lat, pt.lng);
                 if (dist < minDistance) {
                     minDistance = dist;
-                    nearestPoint = pt;
                 }
             });
 
-            if (nearestPoint) {
-                document.getElementById('nearestDistance').innerText = minDistance < 1000 
-                    ? `${Math.round(minDistance)} m` 
-                    : `${(minDistance / 1000).toFixed(1)} km`;
-
-                const bearing = getBearingDegrees(userLat, userLng, nearestPoint.lat, nearestPoint.lng);
-                compassEl.style.transform = `rotate(${Math.round(bearing)}deg)`;
-            }
+            document.getElementById('nearestDistance').innerText = minDistance < 1000 
+                ? `${Math.round(minDistance)} m` 
+                : `${(minDistance / 1000).toFixed(1)} km`;
         }
 
         // Refresh Heatmap & Panel Metrics Based on Filter
@@ -470,7 +618,7 @@
             }
 
             if (currentUserCoords) {
-                updateNearestSignalAndCompass(currentUserCoords.latitude, currentUserCoords.longitude);
+                updateNearestSignal(currentUserCoords.latitude, currentUserCoords.longitude);
             }
         }
 
@@ -482,13 +630,11 @@
             const modeLabel = document.getElementById('currentModeLabel');
 
             if (currentMode === 'collector') {
-                // Set map icon for switching back to User View
                 modeIcon.innerHTML = `<path d="M1 6v14l6-3 6 3 6-3 4 2V4l-4-2-6 3-6-3-5 2zM7 5v13M13 8v13"/>`;
                 recordBtn.style.display = 'inline-flex';
                 modeLabel.innerText = "Contributor View";
                 document.getElementById('statusMessage').innerText = "Contributor Mode: Press Record to capture metrics.";
             } else {
-                // Set waypoint icon for switching to Contributor View
                 modeIcon.innerHTML = `<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>`;
                 recordBtn.style.display = 'none';
                 modeLabel.innerText = "User View";
@@ -501,16 +647,21 @@
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(pos => {
                     currentUserCoords = pos.coords;
-                    const { latitude, longitude } = pos.coords;
+                    const { latitude, longitude, heading } = pos.coords;
                     
                     if (!userLocationMarker) {
-                        userLocationMarker = L.marker([latitude, longitude]).addTo(map);
+                        userLocationMarker = L.marker([latitude, longitude], { icon: createUserTorchIcon() }).addTo(map);
                         map.setView([latitude, longitude], 15);
                     } else {
                         userLocationMarker.setLatLng([latitude, longitude]);
                     }
 
-                    updateNearestSignalAndCompass(latitude, longitude);
+                    // Use GPS heading movement fallback if device orientation sensor isn't active
+                    if (heading !== null && !isNaN(heading)) {
+                        updateHeadingUI(heading);
+                    }
+
+                    updateNearestSignal(latitude, longitude);
                 }, err => {
                     console.warn("Geolocation warning:", err.message);
                 }, { enableHighAccuracy: true });
@@ -530,60 +681,56 @@
         }
 
         // Search Location using OpenStreetMap Nominatim
-       async function searchLocation() {
-    const query = document.getElementById('searchInput').value.trim();
-    if (!query) return;
+        async function searchLocation() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
 
-    const statusEl = document.getElementById('statusMessage');
-    statusEl.innerText = "Searching location & analyzing signal...";
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.innerText = "Searching location & analyzing signal...";
 
-    try {
-        // Query Nominatim API with structured output
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
-        const data = await res.json();
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+                const data = await res.json();
 
-        if (data && data.length > 0) {
-            const searchLat = parseFloat(data[0].lat);
-            const searchLon = parseFloat(data[0].lon);
+                if (data && data.length > 0) {
+                    const searchLat = parseFloat(data[0].lat);
+                    const searchLon = parseFloat(data[0].lon);
 
-            // 1. Pan map to location
-            map.flyTo([searchLat, searchLon], 15, { animate: true, duration: 1.5 });
+                    map.flyTo([searchLat, searchLon], 15, { animate: true, duration: 1.5 });
 
-            // 2. Add temporary search marker
-            if (window.searchMarker) map.removeLayer(window.searchMarker);
-            window.searchMarker = L.circleMarker([searchLat, searchLon], {
-                radius: 10,
-                color: 'var(--accent-color)',
-                fillColor: 'var(--accent-color)',
-                fillOpacity: 0.4
-            }).addTo(map).bindPopup(`<b>${data[0].display_name.split(',')[0]}</b><br>Analyzing signal...`).openPopup();
+                    if (window.searchMarker) map.removeLayer(window.searchMarker);
+                    window.searchMarker = L.circleMarker([searchLat, searchLon], {
+                        radius: 10,
+                        color: 'var(--accent-color)',
+                        fillColor: 'var(--accent-color)',
+                        fillOpacity: 0.4
+                    }).addTo(map).bindPopup(`<b>${data[0].display_name.split(',')[0]}</b><br>Analyzing signal...`).openPopup();
 
-            // 3. Compute RF Metrics around searched location (within 1km radius)
-            const nearbyReadings = allReadings.filter(r => {
-                const dist = getDistanceMeters(searchLat, searchLon, r.lat, r.lng);
-                return dist <= 1000; // 1 km radius
-            });
+                    const nearbyReadings = allReadings.filter(r => {
+                        const dist = getDistanceMeters(searchLat, searchLon, r.lat, r.lng);
+                        return dist <= 1000;
+                    });
 
-            if (nearbyReadings.length > 0) {
-                const avgRssi = Math.round(nearbyReadings.reduce((sum, r) => sum + r.rssi, 0) / nearbyReadings.length);
-                statusEl.innerText = `Search Result: ${data[0].display_name.split(',')[0]} (${nearbyReadings.length} readings nearby, Avg RSSI: ${avgRssi} dBm)`;
-                window.searchMarker.setPopupContent(`<b>${data[0].display_name.split(',')[0]}</b><br>Avg Signal: <b>${avgRssi} dBm</b> (${nearbyReadings.length} samples)`);
-            } else {
-                statusEl.innerText = `Search Result: ${data[0].display_name.split(',')[0]} (No local RF data captured yet)`;
+                    if (nearbyReadings.length > 0) {
+                        const avgRssi = Math.round(nearbyReadings.reduce((sum, r) => sum + r.rssi, 0) / nearbyReadings.length);
+                        statusEl.innerText = `Search Result: ${data[0].display_name.split(',')[0]} (${nearbyReadings.length} readings nearby, Avg RSSI: ${avgRssi} dBm)`;
+                        window.searchMarker.setPopupContent(`<b>${data[0].display_name.split(',')[0]}</b><br>Avg Signal: <b>${avgRssi} dBm</b> (${nearbyReadings.length} samples)`);
+                    } else {
+                        statusEl.innerText = `Search Result: ${data[0].display_name.split(',')[0]} (No local RF data captured yet)`;
+                    }
+
+                    updateNearestSignal(searchLat, searchLon);
+
+                } else {
+                    alert("Location not found. Try a broader search term.");
+                    statusEl.innerText = "Status: Ready";
+                }
+            } catch (err) {
+                console.error("Search error:", err);
+                statusEl.innerText = "Error searching location.";
             }
-
-            // 4. Update Compass to point towards nearest strong signal from searched point
-            updateNearestSignalAndCompass(searchLat, searchLon);
-
-        } else {
-            alert("Location not found. Try a broader search term.");
-            statusEl.innerText = "Status: Ready";
         }
-    } catch (err) {
-        console.error("Search error:", err);
-        statusEl.innerText = "Error searching location.";
-    }
-}
+
         // Continuous Data Recording
         function toggleRecording() {
             const btn = document.getElementById('recordingBtn');
@@ -643,7 +790,8 @@
             }
         }
 
-        // Initialize application
+        // Initialize application & sensors
+        enableOrientationSensors();
         fetchServerData();
         trackUserLocation();
     </script>
