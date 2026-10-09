@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="referrer" content="no-referrer-when-downgrade" />
+    <title>RF Signal Mapper</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        :root {
+            --bg-panel: #1e1e24;
+            --bg-card: #141419;
+            --bg-button: #2a2a35;
+            --border-color: #333333;
+            --border-card: #444444;
+            --text-primary: #ffffff;
+            --text-secondary: #888888;
+            --text-subtle: #aaaaaa;
+            --accent-color: #00d2ff;
+            --accent-glow: rgba(0, 210, 255, 0.4);
+            --danger-color: #dc3545;
+            --success-color: #28a745;
+        }
+
+        body.light-theme {
+            --bg-panel: #ffffff;
+            --bg-card: #f4f5f7;
+            --bg-button: #e9ecef;
+            --border-color: #cccccc;
+            --border-card: #dddddd;
+            --text-primary: #121212;
+            --text-secondary: #666666;
+            --text-subtle: #555555;
+            --accent-color: #0056b3;
+            --accent-glow: rgba(0, 86, 179, 0.3);
+            --danger-color: #dc3545;
+            --success-color: #28a745;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #121212;
+            color: var(--text-primary);
+        }
+
+        #app-wrapper {
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #map-container {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            height: 100%;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* Custom User Marker with Cone Beam */
+        .user-location-torch-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .torch-beam-svg {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            top: 0;
+            left: 0;
+            transform-origin: center center;
+            transition: transform 0.15s ease-out;
+            pointer-events: none;
+        }
+
+        .user-center-dot {
+            width: 14px;
+            height: 14px;
+            background-color: var(--accent-color);
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-glow);
+            z-index: 2;
+        }
+
+        /* Top Bar Controls */
+        .top-controls {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            gap: 8px;
+            width: calc(100% - 24px);
+            max-width: 500px;
+        }
+
+        .search-box {
+            flex: 1;
+            display: flex;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            transition: border-color 0.2s ease;
+        }
+
+            .search-box:focus-within {
+                border-color: var(--accent-color);
+            }
+
+        .search-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 10px 14px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+        }
+
+        .search-btn, .theme-toggle-btn {
+            background: var(--bg-button);
+            border: none;
+            color: var(--accent-color);
+            padding: 0 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease;
+        }
+
+            .search-btn:hover, .theme-toggle-btn:hover {
+                background: var(--border-color);
+            }
+
+        .theme-toggle-btn {
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
+
+        /* Floating Action Buttons */
+        .floating-stack {
+            position: absolute;
+            bottom: 20px;
+            right: 16px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            background: var(--bg-panel);
+            color: var(--accent-color);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: transform 0.15s ease, background 0.2s ease;
+        }
+
+            .icon-btn:active {
+                transform: scale(0.92);
+            }
+
+        /* Bottom Dashboard Panel */
+        .bottom-panel {
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border-color);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1001;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .carrier-filter-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .carrier-select {
+            background: var(--bg-card);
+            color: var(--accent-color);
+            border: 1px solid var(--border-card);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* Metrics Display Grid */
+        .metrics-wrapper {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            background: var(--bg-card);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border-card);
+        }
+
+        .metric-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .metric-value {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        /* Compass & Heading Card */
+        .heading-display-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 8px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            width: 100%;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .compass-container {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .heading-text-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .heading-title {
+            font-size: 9px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .heading-value-container {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .heading-cardinal {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--accent-color);
+        }
+
+        .heading-degrees {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-subtle);
+        }
+
+        /* Action Buttons Row */
+        .actions-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .action-btn-group {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .action-btn {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: none;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: opacity 0.2s ease, transform 0.1s ease;
+        }
+
+            .action-btn:active {
+                transform: scale(0.96);
+            }
+
+        .btn-start {
+            background: var(--success-color);
+        }
+
+        .btn-stop {
+            background: var(--danger-color);
+        }
+
+        .btn-sync {
+            background: #007bff;
+        }
+
+        .btn-delete {
+            background: #6c757d;
+        }
+
+        .status-text {
+            font-size: 11px;
+            color: var(--text-subtle);
+            font-style: italic;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px;
+        }
+
+        /* Precise Heat Area Legend Overlay */
+        .legend-overlay {
+            position: absolute;
+            top: 60px;
+            right: 12px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 12px;
+            z-index: 999;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .legend-title {
+            font-weight: bold;
+            color: var(--text-secondary);
+            margin-bottom: 2px;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+        }
+
+        .legend-color-box {
+            width: 16px;
+            height: 12px;
+            border-radius: 3px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-wrapper">
+        <div id="map-container">
+            <!-- Top Controls Header -->
+            <div class="top-controls">
+                <div class="search-box">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search location..." onkeydown="if(event.key==='Enter') searchLocation()">
+                    <button class="search-btn" onclick="searchLocation()" title="Search">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                    </button>
+                </div>
+                <button class="theme-toggle-btn" onclick="toggleUITheme()" title="Toggle Interface Theme">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+                </button>
+            </div>
+
+            <!-- Signal Color Legend Overlay -->
+            <!-- Signal Color Gradient Legend Overlay -->
+            <div class="legend-overlay">
+                <span class="legend-title">Signal Quality</span>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background: #00ff44;"></div>
+                    <span>-50 to -52 dBm (Peak)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background: #28a745;"></div>
+                    <span>-53 to -65 dBm (Strong)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background: #0033aa;"></div>
+                    <span>-66 to -75 dBm (Good)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background: #00d2ff;"></div>
+                    <span>-76 to -85 dBm (Fair)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background: #ff9900;"></div>
+                    <span>-86 to -95 dBm (Weak)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background: #dc3545;"></div>
+                    <span>&lt; -95 dBm (Poor)</span>
+                </div>
+            </div>
+            <!-- Leaflet Map Canvas -->
+            <div id="map"></div>
+
+            <!-- Floating Sidebar Buttons -->
+            <div class="floating-stack">
+                <button id="modeToggleBtn" class="icon-btn" onclick="toggleMode()" title="Switch Mode">
+                    <svg id="modeIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+                </button>
+                <button class="icon-btn" onclick="recenterToUserLocation()" title="Re-center Location">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" /><line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" /></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Bottom Status Panel -->
+        <div class="bottom-panel">
+            <div class="panel-header">
+                <div class="carrier-filter-container">
+                    <span style="font-size: 12px; color: var(--text-subtle); font-weight: 600;">Provider:</span>
+                    <select id="carrierSelect" class="carrier-select" onchange="filterMapByCarrier()">
+                        <option value="ALL">All Providers</option>
+                        <option value="USB LTE Dongle">USB LTE Dongle</option>
+                        <option value="Jio">Jio</option>
+                        <option value="ESP32 Wi-Fi">ESP32 Wi-Fi</option>
+                        <option value="Airtel">Airtel</option>
+                        <option value="Vodafone Vi">Vodafone Vi</option>
+                    </select>
+                </div>
+                <span id="currentModeLabel" style="font-size: 11px; color: var(--accent-color); font-weight: 700; text-transform: uppercase;">User View</span>
+            </div>
+
+            <div class="metrics-wrapper">
+                <div class="metric-card">
+                    <span class="metric-label">Signal RSSI</span>
+                    <span id="signalStrength" class="metric-value">- dBm</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Nearest Strong</span>
+                    <span id="nearestDistance" class="metric-value">N/A</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Filtered Points</span>
+                    <span id="totalPoints" class="metric-value">0</span>
+                </div>
+            </div>
+
+            <div class="heading-display-card" onclick="enableOrientationSensors()">
+                <div class="compass-container">
+                    <svg id="torchCompassArrow" width="32" height="32" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="var(--border-card)" stroke-width="1.5" />
+                        <polygon points="12,3 16,12 12,9 8,12" fill="var(--accent-color)" />
+                        <polygon points="12,21 16,12 12,9 8,12" fill="var(--text-secondary)" opacity="0.4" />
+                    </svg>
+                </div>
+                <div class="heading-text-group">
+                    <span class="heading-title">User Facing Direction</span>
+                    <div class="heading-value-container">
+                        <span id="headingCardinal" class="heading-cardinal">N</span>
+                        <span id="headingDegrees" class="heading-degrees">0°</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions-row">
+                <span id="statusMessage" class="status-text">Status: Ready</span>
+                <div class="action-btn-group">
+                    <button id="deleteBtn" class="action-btn btn-delete" style="display:none;" onclick="deleteStoredReadings()" title="Clear local & server readings">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
+                        <span>Delete</span>
+                    </button>
+
+                    <button id="recordingBtn" class="action-btn btn-start" style="display:none;" onclick="toggleRecording()">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21" /></svg>
+                        <span>Record</span>
+                    </button>
+
+                    <button class="action-btn btn-sync" onclick="fetchServerData()">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6" /><path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M2.5 16l1.2 0.8a10 10 0 0 0 18.8-4.3" /></svg>
+                        <span>Sync</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+                // Global Application State Variables
+                let currentMode = 'user';
+                let isDarkMode = true;
+                let allReadings = [];
+                let userLocationMarker = null;
+                let currentUserCoords = null;
+                let userHeading = 0;
+
+                let isRecording = false;
+                let recordingWatchId = null;
+                let searchMarker = null;
+
+                // Dynamic Precision Heat Layer Group
+                let heatVectorGroup = L.layerGroup();
+
+                // Initialize Leaflet Map
+                const map = L.map('map', { zoomControl: false }).setView([11.0168, 76.9558], 15);
+
+                // Add OpenStreetMap Tile Layer
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+
+                heatVectorGroup.addTo(map);
+
+                // Helper: Create HTML/SVG User Torch Marker
+                function createUserTorchIcon() {
+                    const htmlContent = `
+                        <div class="user-location-torch-container">
+                            <svg id="svgTorchCone" class="torch-beam-svg" viewBox="0 0 120 120">
+                                <defs>
+                                    <radialGradient id="torchGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                                        <stop offset="0%" stop-color="var(--accent-color)" stop-opacity="0.6"/>
+                                        <stop offset="60%" stop-color="var(--accent-color)" stop-opacity="0.25"/>
+                                        <stop offset="100%" stop-color="var(--accent-color)" stop-opacity="0"/>
+                                    </radialGradient>
+                                </defs>
+                                <path d="M 60 60 L 30 8 A 60 60 0 0 1 90 8 Z" fill="url(#torchGradient)" />
+                            </svg>
+                            <div class="user-center-dot"></div>
+                        </div>
+                    `;
+                    return L.divIcon({
+                        html: htmlContent,
+                        className: '',
+                        iconSize: [120, 120],
+                        iconAnchor: [60, 60]
+                    });
+                }
+
+                // Theme Toggle Handler
+                function toggleUITheme() {
+                    isDarkMode = !isDarkMode;
+                    if (isDarkMode) {
+                        document.body.classList.remove('light-theme');
+                    } else {
+                        document.body.classList.add('light-theme');
+                    }
+                }
+// Dynamic Multi-Tier Gradient Signal Color Mapping
+function getSignalColor(rssi) {
+            if (rssi >= -52 && rssi <= -50) {
+                return '#00ff44'; // Ultra-Bright Neon Green (-50 to -52 dBm: Peak Precision)
+            } else if (rssi >= -65 && rssi < -52) {
+                return '#28a745'; // Standard Green (-53 to -65 dBm: Excellent Signal)
+            } else if (rssi >= -75 && rssi < -65) {
+                return '#0033aa'; // Deep Blue (-66 to -75 dBm: Good Signal)
+            } else if (rssi >= -85 && rssi < -75) {
+                return '#00d2ff'; // Light Blue (-76 to -85 dBm: Fair Signal)
+            } else if (rssi >= -95 && rssi < -85) {
+                return '#ff9900'; // Orange (-86 to -95 dBm: Weak Signal)
+            } else {
+                return '#dc3545'; // Red (< -95 dBm: Poor Signal)
+            }
+}
+
+                // Distance Calculation (Haversine Formula)
+                function getDistanceMeters(lat1, lon1, lat2, lon2) {
+                    const R = 6371e3; // Earth radius in meters
+                    const rad = Math.PI / 180;
+                    const dLat = (lat2 - lat1) * rad;
+                    const dLon = (lon2 - lon1) * rad;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                              Math.cos(lat1 * rad) * Math.cos(lat2 * rad) *
+                              Math.sin(dLon/2) * Math.sin(dLon/2);
+                    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                }
+
+                // Recenter Map to Current GPS Coordinates
+                function recenterToUserLocation() {
+                    if (currentUserCoords) {
+                        map.flyTo([currentUserCoords.latitude, currentUserCoords.longitude], 16, { animate: true, duration: 1 });
+                    } else {
+                        alert("Acquiring GPS location... Please verify location permissions.");
+                    }
+                }
+
+                // Convert Heading Angle to Cardinal Direction String
+                function degreesToCardinal(deg) {
+                    const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+                    const index = Math.round(deg / 45) % 8;
+                    return cardinals[index];
+                }
+
+                // Update Compass / Facing UI Elements
+                function updateHeadingUI(heading) {
+                    userHeading = Math.round(heading);
+
+                    const torchConeEl = document.getElementById('svgTorchCone');
+                    if (torchConeEl) {
+                        torchConeEl.style.transform = `rotate(${userHeading}deg)`;
+                    }
+
+                    const torchCompassArrow = document.getElementById('torchCompassArrow');
+                    if (torchCompassArrow) {
+                        torchCompassArrow.style.transform = `rotate(${userHeading}deg)`;
+                    }
+
+                    document.getElementById('headingCardinal').innerText = degreesToCardinal(userHeading);
+                    document.getElementById('headingDegrees').innerText = `${userHeading}°`;
+                }
+
+                // Device Orientation Event Listener
+                function handleOrientation(event) {
+                    let heading = null;
+                    if (event.webkitCompassHeading) {
+                        heading = event.webkitCompassHeading; // iOS
+                    } else if (event.alpha !== null) {
+                        heading = (360 - event.alpha) % 360; // Android / standard
+                    }
+
+                    if (heading !== null) {
+                        updateHeadingUI(heading);
+                    }
+                }
+
+                // Request Orientation Permissions (iOS / Modern Mobile Browsers)
+                function enableOrientationSensors() {
+                    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                        DeviceOrientationEvent.requestPermission()
+                            .then(response => {
+                                if (response === 'granted') {
+                                    window.addEventListener('deviceorientation', handleOrientation, true);
+                                }
+                            })
+                            .catch(console.error);
+                    } else {
+                        window.addEventListener('deviceorientationabsolute', handleOrientation, true) ||
+                        window.addEventListener('deviceorientation', handleOrientation, true);
+                    }
+                }
+
+                // Find & Calculate Distance to Nearest Strong Point (>= -70 dBm)
+                function updateNearestSignal(userLat, userLng) {
+                    const selectedCarrier = document.getElementById('carrierSelect').value;
+
+                    let filteredReadings = allReadings;
+                    if (selectedCarrier !== 'ALL') {
+                        filteredReadings = allReadings.filter(r => r.carrier === selectedCarrier);
+                    }
+
+                    const strongPoints = filteredReadings.filter(r => r.rssi >= -70);
+
+                    if (strongPoints.length === 0) {
+                        document.getElementById('nearestDistance').innerText = 'None';
+                        return;
+                    }
+
+                    let minDistance = Infinity;
+                    strongPoints.forEach(pt => {
+                        const dist = getDistanceMeters(userLat, userLng, pt.lat, pt.lng);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                        }
+                    });
+
+                    document.getElementById('nearestDistance').innerText = minDistance < 1000
+                        ? `${Math.round(minDistance)} m`
+                        : `${(minDistance / 1000).toFixed(1)} km`;
+                }
+
+                // Render High-Precision Polygon Heat Map
+                function filterMapByCarrier() {
+                    const selectedCarrier = document.getElementById('carrierSelect').value;
+
+                    let filtered = allReadings;
+                    if (selectedCarrier !== 'ALL') {
+                        filtered = allReadings.filter(r => r.carrier === selectedCarrier);
+                    }
+
+                    // Clear previous heat zones
+                    heatVectorGroup.clearLayers();
+
+                    // Render precise metric geographical coverage circles (12-meter radius zones)
+                    filtered.forEach(r => {
+                        const heatColor = getSignalColor(r.rssi);
+
+                        const heatCircle = L.circle([r.lat, r.lng], {
+                            radius: 12, // Fixed 12 meters radius anchored geographically
+                            stroke: false,
+                            fillColor: heatColor,
+                            fillOpacity: 0.65
+                        });
+
+                        // User Popup on click
+                        const formattedTime = r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : 'N/A';
+                        const popupContent = `
+                            <div style="font-family: sans-serif; font-size: 12px; color: #111;">
+                                <b style="color:${heatColor}; font-size: 15px;">${r.rssi} dBm</b><br/>
+                                <b>Provider:</b> ${r.carrier || 'USB LTE Dongle'}<br/>
+                                <b>Location:</b> ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}<br/>
+                                <b>Timestamp:</b> ${formattedTime}
+                            </div>
+                        `;
+                        heatCircle.bindPopup(popupContent);
+
+                        heatVectorGroup.addLayer(heatCircle);
+                    });
+
+                    document.getElementById('totalPoints').innerText = filtered.length;
+
+                    if (filtered.length > 0) {
+                        const last = filtered[filtered.length - 1];
+                        document.getElementById('signalStrength').innerText = `${last.rssi} dBm`;
+                    } else {
+                        document.getElementById('signalStrength').innerText = `- dBm`;
+                    }
+
+                    if (currentUserCoords) {
+                        updateNearestSignal(currentUserCoords.latitude, currentUserCoords.longitude);
+                    }
+                }
+
+                // Toggle Between User View & Contributor View
+                function toggleMode() {
+                    currentMode = (currentMode === 'user') ? 'collector' : 'user';
+                    const modeIcon = document.getElementById('modeIcon');
+                    const recordBtn = document.getElementById('recordingBtn');
+                    const deleteBtn = document.getElementById('deleteBtn');
+                    const modeLabel = document.getElementById('currentModeLabel');
+
+                    if (currentMode === 'collector') {
+                        modeIcon.innerHTML = `<path d="M1 6v14l6-3 6 3 6-3 4 2V4l-4-2-6 3-6-3-5 2zM7 5v13M13 8v13"/>`;
+                        recordBtn.style.display = 'inline-flex';
+                        deleteBtn.style.display = 'inline-flex';
+                        modeLabel.innerText = "Contributor View";
+                        document.getElementById('statusMessage').innerText = "Contributor Mode: Ready to record.";
+                    } else {
+                        modeIcon.innerHTML = `<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>`;
+                        recordBtn.style.display = 'none';
+                        deleteBtn.style.display = 'none';
+                        modeLabel.innerText = "User View";
+                        document.getElementById('statusMessage').innerText = "Status: Viewing map coverage.";
+                    }
+                }
+
+                // Geolocation Watch Position
+                function trackUserLocation() {
+                    if ("geolocation" in navigator) {
+                        navigator.geolocation.watchPosition(pos => {
+                            currentUserCoords = pos.coords;
+                            const { latitude, longitude, heading } = pos.coords;
+
+                            if (!userLocationMarker) {
+                                userLocationMarker = L.marker([latitude, longitude], { icon: createUserTorchIcon() }).addTo(map);
+                                map.setView([latitude, longitude], 15);
+                            } else {
+                                userLocationMarker.setLatLng([latitude, longitude]);
+                            }
+
+                            if (heading !== null && !isNaN(heading)) {
+                                updateHeadingUI(heading);
+                            }
+
+                            updateNearestSignal(latitude, longitude);
+                        }, err => {
+                            console.warn("Geolocation access warning:", err.message);
+                        }, { enableHighAccuracy: true });
+                    }
+                }
+
+                // Fetch Server Data Endpoint
+                async function fetchServerData() {
+                    try {
+                        const res = await fetch('/api/readings');
+                        if (!res.ok) throw new Error("Fetch error");
+                        allReadings = await res.json();
+                        filterMapByCarrier();
+                        document.getElementById('statusMessage').innerText = "Map data updated.";
+                    } catch (err) {
+                        document.getElementById('statusMessage').innerText = "Server offline. Showing cached readings.";
+                    }
+                }
+
+                // Delete Stored Readings Endpoint
+                async function deleteStoredReadings() {
+                    if (!confirm("Are you sure you want to delete all stored readings from local view and the server?")) {
+                        return;
+                     }
+
+                    try {
+                        const res = await fetch('/api/readings', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+
+                        if (!res.ok) {
+                            throw new Error(`Server returned HTTP ${res.status}`);
+                        }
+
+                        const result = await res.json();
+
+                        if (result.success) {
+                            allReadings = [];
+                            filterMapByCarrier();
+                            document.getElementById('statusMessage').innerText = "All readings deleted successfully.";
+                        } else {
+                            alert("Failed to delete readings from server.");
+                        }
+                    } catch (err) {
+                        console.error("Delete error:", err);
+                        document.getElementById('statusMessage').innerText = `Error deleting readings: ${err.message}`;
+                    }
+                }
+
+                // Contributor Mode: Dynamic Signal Recording Toggle
+               // Contributor Mode: Dynamic Signal Recording Toggle
+function toggleRecording() {
+            const btn = document.getElementById('recordingBtn');
+
+            if (!isRecording) {
+                if (!currentUserCoords) {
+                    alert("Acquiring GPS location... Please wait a moment and try again.");
+                    return;
+                }
+
+                isRecording = true;
+                btn.className = "action-btn btn-stop";
+                btn.querySelector('span').innerText = "Stop";
+                document.getElementById('statusMessage').innerText = "Logging continuous signal data...";
+
+                // Single step function to query dongle and post reading
+                const recordStep = async () => {
+                    if (!currentUserCoords) return;
+
+                    let currentRssi = null;
+
+                    try {
+                        const signalRes = await fetch('/api/dongle-signal');
+                        if (signalRes.ok) {
+                            const signalData = await signalRes.json();
+                            currentRssi = signalData.rssi;
+                        } else {
+                            const errData = await signalRes.json();
+                            document.getElementById('statusMessage').innerText = errData.error || "Module Not Connected";
+                            return;
+                        }
+                    } catch (err) {
+                        document.getElementById('statusMessage').innerText = "Server Unreachable";
+                        return;
+                    }
+
+                    if (currentRssi === null || currentRssi === undefined) {
+                        document.getElementById('statusMessage').innerText = "Module signal invalid";
+                        return;
+                    }
+
+                    const selectedCarrier = document.getElementById('carrierSelect').value;
+                    const targetCarrier = (selectedCarrier !== 'ALL') ? selectedCarrier : "USB LTE Dongle";
+
+                    try {
+                        await fetch('/api/readings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lat: currentUserCoords.latitude,
+                                lng: currentUserCoords.longitude,
+                                rssi: currentRssi,
+                                carrier: targetCarrier,
+                                timestamp: new Date().toISOString()
+                            })
+                        });
+
+                        document.getElementById('statusMessage').innerText = `Recorded: ${currentRssi} dBm`;
+                        fetchServerData(); // Refresh map with new reading
+                    } catch (err) {
+                        console.error("Failed to post signal reading:", err);
+                    }
+                };
+
+                // Take first reading immediately
+                recordStep();
+
+                // Repeat reading every 4 seconds ONLY while Record is active
+                recordingWatchId = setInterval(recordStep, 4000);
+
+            } else {
+                // Stop continuous recording
+                isRecording = false;
+                if (recordingWatchId !== null) {
+                    clearInterval(recordingWatchId);
+                    recordingWatchId = null;
+                }
+                btn.className = "action-btn btn-start";
+                btn.querySelector('span').innerText = "Record";
+                document.getElementById('statusMessage').innerText = "Recording stopped.";
+            }
+}
+                // Nominatim Geocoding Search Helper
+                async function searchLocation() {
+                    const query = document.getElementById('searchInput').value.trim();
+                    if (!query) return;
+
+                    const statusEl = document.getElementById('statusMessage');
+                    statusEl.innerText = "Searching location & analyzing signal...";
+
+                    try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+                        const data = await res.json();
+
+                        if (data && data.length > 0) {
+                            const searchLat = parseFloat(data[0].lat);
+                            const searchLon = parseFloat(data[0].lon);
+
+                            map.flyTo([searchLat, searchLon], 15, { animate: true, duration: 1.5 });
+
+                            if (searchMarker) map.removeLayer(searchMarker);
+                            searchMarker = L.circleMarker([searchLat, searchLon], {
+                                radius: 10,
+                                color: 'var(--accent-color)',
+                                fillColor: 'var(--accent-color)',
+                                fillOpacity: 0.4
+                            }).addTo(map).bindPopup(`<b>${data[0].display_name.split(',')[0]}</b>`).openPopup();
+
+                            updateNearestSignal(searchLat, searchLon);
+                            statusEl.innerText = "Ready";
+                        } else {
+                            alert("Location not found.");
+                            statusEl.innerText = "Ready";
+                        }
+                    } catch (err) {
+                        console.error("Search error:", err);
+                        statusEl.innerText = "Error searching location.";
+                    }
+                }
+
+                // Initialize App Systems
+                enableOrientationSensors();
+                fetchServerData();
+                trackUserLocation();
+    </script>
+</body>
+</html>
