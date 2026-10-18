@@ -60,7 +60,27 @@ app.get('/api/readings', async (req, res) => {
     }
 });
 
-/* POST: Save each reading to PostgreSQL */
+// Calculate distance between two GPS coordinates in metres
+function distanceInMetres(lat1, lng1, lat2, lng2) {
+    const toRadians = degrees => degrees * Math.PI / 180;
+    const earthRadius = 6371000;
+
+    const dLat = toRadians(lat2 - lat1);
+    const dLng = toRadians(lng2 - lng1);
+
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRadians(lat1)) *
+        Math.cos(toRadians(lat2)) *
+        Math.sin(dLng / 2) ** 2;
+
+    return earthRadius * 2 * Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+    );
+}
+
+/* POST: Save unique readings to PostgreSQL */
 app.post('/api/readings', async (req, res) => {
     try {
         const { lat, lng, rssi, carrier, timestamp } = req.body;
@@ -96,7 +116,52 @@ app.post('/api/readings', async (req, res) => {
                 ? carrier.trim()
                 : 'Unknown Carrier';
 
-        const recordedAt = timestamp || new Date().toISOString();
+        let recordedAt = new Date();
+
+        if (timestamp !== undefined && timestamp !== null) {
+            const suppliedDate = new Date(timestamp);
+
+            if (!Number.isFinite(suppliedDate.getTime())) {
+                return res.status(400).json({
+                    error: 'Invalid timestamp'
+                });
+            }
+
+            recordedAt = suppliedDate;
+        }
+
+        // Look at recent readings to detect duplicate samples.
+        // This check uses server time, not the phone's clock.
+        const recent = await pool.query(`
+            SELECT lat, lng, rssi, carrier
+            FROM public.readings
+            WHERE recorded_at >= NOW() - INTERVAL '5 minutes'
+            ORDER BY recorded_at DESC
+            LIMIT 500
+        `);
+
+        const duplicate = recent.rows.some(row => {
+            const distance = distanceInMetres(
+                latitude,
+                longitude,
+                Number(row.lat),
+                Number(row.lng)
+            );
+
+            return (
+                distance <= 10 &&
+                Number(row.rssi) === signal &&
+                row.carrier === network
+            );
+        });
+
+        if (duplicate) {
+            return res.status(200).json({
+                status: 'Duplicate skipped',
+                saved: false,
+                message: 'An equivalent reading already exists nearby.'
+            });
+        }
 
         const result = await pool.query(
             `INSERT INTO public.readings
@@ -108,18 +173,21 @@ app.post('/api/readings', async (req, res) => {
             [latitude, longitude, signal, network, recordedAt]
         );
 
-        res.status(201).json({
+        return res.status(201).json({
             status: 'Success',
+            saved: true,
             reading: result.rows[0]
         });
+
     } catch (error) {
         console.error('Error saving reading:', error);
-        res.status(500).json({
+
+        return res.status(500).json({
             error: 'Failed to save reading'
         });
     }
 });
 
-app.listen(3000, '0.0.0.0', () => {
-    console.log('Server running on port 3000');
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
 });
