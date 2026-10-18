@@ -2,6 +2,12 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const { Pool } = require('pg');
+
+const pool = new Pool({
+  connectionString: process.env.postgresql://rf_signal_readings_user:Hyeo88dD6QJcc2xdiWW15dQLuTA6vUVd@dpg-db7399mk1f9s73c3535g-a.singapore-postgres.render.com/rf_signal_readings,
+  ssl: { rejectUnauthorized: false }
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,34 +36,88 @@ function readReadingsFromFile() {
     }
 }
 
-// POST: Endpoint to receive signal readings from mobile app or web client
-app.post('/api/readings', (req, res) => {
-    const { lat, lng, rssi, carrier, timestamp } = req.body;
-    
-    if (lat === undefined || lng === undefined || rssi === undefined) {
-        return res.status(400).json({ error: 'Missing lat, lng, or rssi' });
+/* GET: Retrieve readings from PostgreSQL */
+app.get('/api/readings', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                id,
+                lat,
+                lng,
+                rssi,
+                carrier,
+                recorded_at AS timestamp
+            FROM public.readings
+            ORDER BY recorded_at ASC, id ASC
+        `);
+
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching readings:', error);
+        res.status(500).json({
+            error: 'Failed to fetch readings'
+        });
     }
-
-    const newReading = {
-        lat: parseFloat(lat),
-        lng: parseFloat(lng),
-        rssi: parseFloat(rssi),
-        carrier: (carrier && carrier.trim()) ? carrier.trim() : "Unknown Carrier",
-        timestamp: timestamp || new Date().toISOString()
-    };
-
-    const fileData = readReadingsFromFile();
-    fileData.push(newReading);
-    
-    fs.writeFileSync(DATA_FILE, JSON.stringify(fileData, null, 2));
-
-    res.status(201).json({ status: 'Success', reading: newReading });
 });
 
-// GET: Endpoint to fetch all stored readings
-app.get('/api/readings', (req, res) => {
-    const fileData = readReadingsFromFile();
-    res.json(fileData);
+/* POST: Save each reading to PostgreSQL */
+app.post('/api/readings', async (req, res) => {
+    try {
+        const { lat, lng, rssi, carrier, timestamp } = req.body;
+
+        if (
+            lat === undefined || lat === null || lat === '' ||
+            lng === undefined || lng === null || lng === '' ||
+            rssi === undefined || rssi === null || rssi === ''
+        ) {
+            return res.status(400).json({
+                error: 'Missing lat, lng, or rssi'
+            });
+        }
+
+        const latitude = Number(lat);
+        const longitude = Number(lng);
+        const signal = Number(rssi);
+
+        if (
+            !Number.isFinite(latitude) ||
+            !Number.isFinite(longitude) ||
+            !Number.isFinite(signal) ||
+            latitude < -90 || latitude > 90 ||
+            longitude < -180 || longitude > 180
+        ) {
+            return res.status(400).json({
+                error: 'Invalid latitude, longitude, or RSSI'
+            });
+        }
+
+        const network =
+            typeof carrier === 'string' && carrier.trim()
+                ? carrier.trim()
+                : 'Unknown Carrier';
+
+        const recordedAt = timestamp || new Date().toISOString();
+
+        const result = await pool.query(
+            `INSERT INTO public.readings
+                (lat, lng, rssi, carrier, recorded_at)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING
+                id, lat, lng, rssi, carrier,
+                recorded_at AS timestamp`,
+            [latitude, longitude, signal, network, recordedAt]
+        );
+
+        res.status(201).json({
+            status: 'Success',
+            reading: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error saving reading:', error);
+        res.status(500).json({
+            error: 'Failed to save reading'
+        });
+    }
 });
 
 app.listen(3000, '0.0.0.0', () => {
